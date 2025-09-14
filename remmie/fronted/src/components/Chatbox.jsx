@@ -95,7 +95,7 @@ export default function Chatbox() {
             //https://remmie.co:5678/webhook/4e01d18e-de75-4e0c-80b8-bf9aae6e08f6/chat
             
             const res = await axios.post(
-                'https://remmie.co:5678/webhook/3176c1ff-171f-4881-9c93-923ad256f38a/chat',
+                '/webhook/3176c1ff-171f-4881-9c93-923ad256f38a/chat',
                 payload,
                 {
                     headers: {

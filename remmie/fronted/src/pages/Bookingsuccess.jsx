@@ -91,7 +91,7 @@ export default function BookingSuccess() {
           };
 
           const orderResponse = await axios.post(
-            'https://remmie.co:5000/api/flight/create-conform-order',
+            '/api/flight/create-conform-order',
             confirmOrderPayload,
             { headers: { 'Content-Type': 'application/json' } }
           );

@@ -130,7 +130,7 @@ const Changepassword = () => {
       const token = localStorage.getItem('token');
 
       const response = await axios.post(
-        'https://remmie.co:5000/api/auth/change-password',
+        '/api/auth/change-password',
         {
           oldpassword: currentPassword,
           newpassword: newPassword,
