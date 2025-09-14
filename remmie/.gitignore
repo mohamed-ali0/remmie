@@ -9,8 +9,8 @@ npm-debug.log*
 yarn-error.log*
 
 # Python Dependencies & Cache
-venv/
-*/venv/
+#venv/
+#*/venv/
 __pycache__/
 */__pycache__/
 *.pyc
