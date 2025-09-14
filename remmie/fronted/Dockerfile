@@ -1,6 +1,17 @@
-# Frontend Dockerfile
 # Build stage
 FROM node:18-alpine as build
+
+# === EDIT 1: Accept build-time variables for Vite ===
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ARG VITE_PYTHON_API_URL
+ENV VITE_PYTHON_API_URL=$VITE_PYTHON_API_URL
+ARG VITE_GOOGLE_CLIENT_ID
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+ARG VITE_STRIPE_PUBLIC_KEY
+ENV VITE_STRIPE_PUBLIC_KEY=$VITE_STRIPE_PUBLIC_KEY
 
 WORKDIR /app
 
@@ -18,6 +29,9 @@ RUN npm run build
 
 # Production stage
 FROM nginx:alpine
+
+# === EDIT 2: Install curl for the healthcheck ===
+RUN apk add --no-cache curl
 
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
