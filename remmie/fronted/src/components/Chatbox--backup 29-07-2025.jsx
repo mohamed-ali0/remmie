@@ -38,7 +38,7 @@ export default function Chatbox() {
                 ...(threadId && { thread_id: threadId })
             };
 
-            const res = await axios.post(`/chat`, payload);
+            const res = await axios.post(`https://remmie.co/chat`, payload);
 
             const botMsg = { sender: 'bot', text: res.data.response };
             setMessages(prev => [...prev, botMsg]);

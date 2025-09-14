@@ -25,7 +25,7 @@ export default function StaysOrderHistory() {
       setError(null);
       
       const response = await axios.post(
-        '/api/booking/get-user-stays-booking-list',
+        'https://remmie.co:5000/api/booking/get-user-stays-booking-list',
         {},
         { 
           headers: { 

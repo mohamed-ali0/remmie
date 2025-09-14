@@ -28,7 +28,7 @@ export default function PaymentMethods() {
     try {
       setLoading(true);
       const res = await axios.post(
-        "/api/stripe/user-payment-methods-list",
+        "https://remmie.co:5000/api/stripe/user-payment-methods-list",
         { booking_ref: "BOOK-7FFB82", session_id: "cs_test_xxx" },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -51,7 +51,7 @@ export default function PaymentMethods() {
     if (!window.confirm("Delete this card?")) return;
     try {
       await axios.post(
-        "/api/stripe/user-payment-methods-delete",
+        "https://remmie.co:5000/api/stripe/user-payment-methods-delete",
         { card_id: id },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -65,7 +65,7 @@ export default function PaymentMethods() {
   const setDefaultCard = async (id) => {
     try {
       await axios.post(
-        "/api/stripe/user-payment-methods-setdefault",
+        "https://remmie.co:5000/api/stripe/user-payment-methods-setdefault",
         { card_id: id },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -101,7 +101,7 @@ export default function PaymentMethods() {
 
       // 2. Send to backend
       await axios.post(
-        "/api/stripe/user-payment-methods-add",
+        "https://remmie.co:5000/api/stripe/user-payment-methods-add",
         { payment_method_id: paymentMethod.id },
         { headers: { Authorization: `Bearer ${token}` } }
       );

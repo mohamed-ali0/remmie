@@ -160,7 +160,7 @@ export default function flightorderhistory() {
       const token = getToken();
       try {
         const response = await axios.post(
-          '/api/booking/get-user-booking-list',
+          'https://remmie.co:5000/api/booking/get-user-booking-list',
           {},
           { headers: { Authorization: `Bearer ${token}` } }
         );

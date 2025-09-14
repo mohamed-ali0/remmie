@@ -31,7 +31,7 @@ const BookingDetails = () => {
 
       try {
         const response = await axios.post(
-          '/api/booking/get-user-single-booking',
+          'https://remmie.co:5000/api/booking/get-user-single-booking',
           { booking_ref: ref },
           {
             headers: {
