@@ -1,4 +1,3 @@
-from supabase import create_client, Client
 import config
 import requests
 import json
