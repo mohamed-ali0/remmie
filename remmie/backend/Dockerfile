@@ -21,9 +21,7 @@ RUN mkdir -p uploads/user_profile
 # Expose port
 EXPOSE 5000
 
-# Add healthcheck
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:5000/api/health || exit 1
+
 
 # Start the application
 CMD ["node", "server.js"]
