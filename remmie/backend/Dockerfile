@@ -1,5 +1,7 @@
-# Backend Dockerfile
 FROM node:18-alpine
+
+# Install curl so the HEALTHCHECK instruction can run
+RUN apk add --no-cache curl
 
 # Set working directory
 WORKDIR /app
