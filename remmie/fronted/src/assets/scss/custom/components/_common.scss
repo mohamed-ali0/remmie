@@ -1,0 +1,78 @@
+.btn{
+    padding: 8px 22px;
+    border-radius: 30px;
+}
+.btn-primary{
+    background-color: $theme-primary;
+}
+.btn-white{
+    color: $theme-primary !important;
+    background-color: $white !important;
+}
+input.form-control,
+input.form-control:focus{
+    box-shadow: none;
+    outline: none;
+}
+.bg_light{
+    background-color: $bg-light;
+}
+.bg-light{
+    background-color: #F3F6F8 !important;
+}
+.bg_primary{
+    background-color: $theme-primary;
+}
+.bg_secondary{
+    background-color: $theme-secondary;
+}
+.text_success{
+    color: $theme-success;
+}
+.text_primary{
+    color: $theme-primary;
+}
+.text_light{
+    color: $font-light;
+}
+.title{
+    font-size: 32px;
+    font-weight: 600;
+    color: $theme-primary;
+}
+.title_second{
+    padding-bottom: 25px;
+    position: relative;
+    &::before{
+        width: 60px;
+        height: 3px;
+        background-color: $theme-primary;
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;       
+    }
+}
+.space-py-100{
+    padding-top: 100px;
+    padding-bottom: 100px;
+}
+.space-pt-100{
+    padding-top: 100px;
+}
+.space-pb-100{
+    padding-bottom: 100px;
+}
+.space-py-50{
+    padding-top: 50px;
+    padding-bottom: 50px;
+}
+.space-pt-50{
+    padding-top: 50px;
+}
+.space-pb-50{
+    padding-bottom: 50px;
+}
+.font_light{
+    color: $font-light;
+}

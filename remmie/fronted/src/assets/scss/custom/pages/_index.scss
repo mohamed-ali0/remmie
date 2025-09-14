@@ -1,0 +1,121 @@
+
+.hero_section{
+    background: linear-gradient(160deg, $theme-secondary 10%, #00449F 65%);
+    border-radius: 15px;   
+    padding-top: 80px;
+    padding-bottom: 80px;
+    h2{
+        font-size: 58px;
+    }
+    p{
+        font-size: 20px;
+    }
+    .btn{
+        min-width: 208px;
+        text-align: center;
+    }
+}
+
+
+.tolkinstently_grid{
+    .img_wrap{
+        border-radius: 30px;
+    }
+    .tolkinstently_detail{
+        padding-top: 50px;
+        text-align: center;
+        h4{
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            
+        }
+        p{
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+        .button_group{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+    }
+}
+
+.accordion{
+    border-radius: 18px;
+    // box-shadow: 0 5px 16px 0 rgba($black,6%);
+    border: none;  
+    .accordion-item{
+        border: none;
+        padding: 30px 40px;
+        border-radius: 15px;
+        border: 2px solid transparent;
+        &:nth-child(n+2){
+            margin-top: 20px;
+        }  
+        &.active{
+            border-color: $theme-primary;
+        }
+    }    
+    .accordion-header{
+        .accordion-button{
+            font-size: 22px;
+            font-weight: 700;
+            box-shadow: none;
+            padding: 0;
+            &:after{
+                display: none;
+            }
+            .icon_wrap{
+                transition: all 0.3s ease;
+                svg{
+                    transition: all 0.3s ease;
+                }
+            }
+            &:not(.collapsed){
+                color: $theme-primary;
+                .icon_wrap{
+                    background-color: $theme-primary;
+                    transition: all 0.3s ease;
+                    svg{
+                        color: $white;
+                        transform: rotate(180deg);
+                        transition: all 0.3s ease;
+                    }
+                }
+            }
+        }
+        .icon_wrap{
+            border-radius: 50%;
+            box-shadow: 0 5px 16px 0 rgba($black,6%);
+            max-width: 48px;
+            max-height: 48px;
+            min-width: 48px;
+            min-height: 48px;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-left: auto;
+            svg{
+                color: $theme-primary;
+            }
+        }
+    }
+    .accordion-body{
+        font-size: 18px;       
+        padding: 0;
+    padding-top: 15px;
+        color: $font-light;
+    }
+    .accordion-button{
+        &:not(.collapsed){
+            background-color: transparent;
+            box-shadow: none;
+        }
+    }
+    
+}

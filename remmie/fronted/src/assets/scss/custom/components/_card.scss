@@ -1,0 +1,26 @@
+.card{
+    border: none;
+    border-radius: 18px;
+    box-shadow: 0px 9px 20px rgba($black,.07);
+    .card-body{
+        padding: 25px;
+    }
+    .dropzone {
+        width: 100%;
+        max-width: 160px;
+        height: 160px;
+        margin: 0 auto;
+        border-radius: 50%;
+        .dz-default{
+            .upload-icon{
+                img{
+                    border: 1px solid #000000;
+                    object-fit: cover;
+                    border-radius: 50%;
+                    height: 160px;
+                    display: block;
+                }
+            }
+        }
+    }
+}

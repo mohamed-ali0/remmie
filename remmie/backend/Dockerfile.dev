@@ -1,0 +1,23 @@
+# Backend Development Dockerfile
+FROM node:18-alpine
+
+# Install nodemon for hot reload
+RUN npm install -g nodemon
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies (including dev dependencies)
+RUN npm install
+
+# Create uploads directory
+RUN mkdir -p uploads/user_profile
+
+# Expose port
+EXPOSE 5000
+
+# Start with nodemon for hot reload
+CMD ["nodemon", "server.js"]

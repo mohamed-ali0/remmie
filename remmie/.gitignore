@@ -1,0 +1,29 @@
+# Secrets
+.env
+*/.env
+
+# Node.js Dependencies
+node_modules/
+*/node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Python Dependencies & Cache
+venv/
+*/venv/
+__pycache__/
+*/__pycache__/
+*.pyc
+
+# Frontend Build Output
+fronted/dist/
+
+# User Uploads
+backend/uploads/
+
+# General
+.DS_Store
+*.log
+*.zip
+*.sql
+backend.zip

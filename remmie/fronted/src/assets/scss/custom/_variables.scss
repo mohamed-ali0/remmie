@@ -1,0 +1,17 @@
+$font-inter: "Inter", sans-serif;
+
+$black:#121212;
+$white: #ffffff;
+$theme-primary: #0863BC;
+$theme-secondary:#FC9CA8;
+$theme-success:#37BC4A;
+$font-light: #6F6C90;
+$bg-light: #F3FBFF;
+$bg-grey:#f5f8fd;
+$text-detaukt:#728373;
+
+$theme-colors:(
+    "primary":    $theme-primary,
+    "secondary":  $theme-secondary,
+    "success":    $theme-success,
+);

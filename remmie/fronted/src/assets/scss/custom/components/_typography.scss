@@ -1,0 +1,68 @@
+/*******************
+ 01 TYPOGRAPHY START
+********************/
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+body {
+	font-family: $font-inter;
+	font-size: 14px;
+	font-weight: 400;
+	color:$black;
+	scroll-behavior: smooth;	
+	background-color: $white;
+}
+a {
+	color: $black;
+	outline: none;
+	transition: all 0.3s ease-in-out;
+	text-decoration: none;
+    cursor: pointer;
+	&:focus,&:active {
+		outline: none;	
+		transition: all 0.3s ease-in-out;
+		text-decoration: none;
+	}
+	&:hover {
+		outline: none;
+		transition: all 0.3s ease-in-out;
+		text-decoration: none;
+		color: $theme-primary;
+	}
+}
+p{
+    font-size: 18px;
+}
+ul {
+	margin: 0;
+	padding: 0;
+}
+li {
+	list-style: none;
+    display: inline-block;
+}
+h1,h2,h3,h4,h5,h6,p{
+    margin-bottom:0;
+}
+h1 {	
+	font-weight: 400;
+	font-size: 40px;
+}
+h2 {
+	font-weight: 400;
+	font-size: 35px;
+}
+h3 {	
+	font-weight: 400;
+	font-size: 28px;
+}
+h4 {
+	font-weight: 400;	
+	font-size: 22px;
+}
+h5 {
+	font-weight: 400;
+	font-size: 18px;
+}
+h6 {
+	font-weight: 400;
+	font-size: 16px;
+}

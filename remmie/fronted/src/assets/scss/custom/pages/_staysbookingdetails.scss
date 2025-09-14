@@ -1,0 +1,325 @@
+*{
+	box-sizing: border-box;
+}
+
+.booking-card {
+  background: #f9f9fc;
+  border-radius: 8px;
+  padding: 20px;
+  color: #333;
+
+  .booking-row {
+    display: flex;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    .booking-col{
+    	width: 100%;
+    	max-width: 40%;
+    	.label {
+	      font-size: 14px;
+	      color: #666;
+	      margin-bottom: 4px;
+	    }
+
+	    .value {
+	      font-size: 15px;
+	      font-weight: 500;
+	      color: #222;
+	    }
+	    .link {
+	      color: #1a73e8;
+	      font-weight: 600;
+	      text-decoration: none;
+
+	      &:hover {
+	        text-decoration: underline;
+	      }
+	    }
+	    .status {
+	      padding: 4px 10px;
+	      border-radius: 20px;
+	      font-size: 13px;
+	      font-weight: 600;
+
+	      &.confirmed {
+	        background: #e6f7ec;
+	        color: #1f9d55;
+	        border: 1px solid #b4e2c0;
+	      }
+	      &.pending {
+	        background: #ffff0040;
+	    		color: #545412;
+	    		border: 1px solid #545412;
+	      }
+	      &.pending_confirmation {
+	        background: #ff490040;
+				    color: #542e12e0;
+	      }
+	    }
+        .guest-name {
+	      margin-top: 4px;
+	      font-weight: 600;
+	      color: #000;
+	    }
+    }
+  }
+}
+
+
+
+.section-title {
+	font-size: 18px;
+	font-weight: 600;
+	margin: 20px 0 10px;
+}
+
+.booking-card {
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 20px;
+
+    .hotel-info {
+	    display: flex;
+	    gap: 15px;
+	    flex: 1;
+
+	    .hotel-img {
+	      width: 90px;
+	      height: 90px;
+	      object-fit: cover;
+	      border-radius: 6px;
+	    }
+
+	    .hotel-details {
+	      .hotel-name {
+	        font-size: 16px;
+	        font-weight: 600;
+	        margin: 0;
+
+	        .stars {
+	          color: #f4b400;
+	          font-size: 14px;
+	          margin-left: 6px;
+	        }
+	      }
+
+	      .hotel-address {
+	        font-size: 14px;
+	        color: #666;
+	        margin: 4px 0;
+	      }
+	    }
+	}
+	.room-type{
+		display: flex;
+		gap: 20px;
+		span{
+			width: 20px;
+			height: 20px;
+			background: #f9f8fc;
+			border-radius: 3px;
+			padding: 3px;
+			font-size: 14px;
+		}
+	}
+	.meal-info{
+		display: flex;
+		gap: 10px;
+	}
+	.check-section {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		min-width: 250px;
+
+		.check-in,
+		.check-out {
+		  text-align: left;
+		  width: 100%;
+		  max-width: 50%;
+
+		  .label {
+		    font-size: 12px;
+		    color: #888;
+		  }
+
+		  .date {
+		    font-size: 15px;
+		    font-weight: 600;
+		    color: #1a1a40;
+		    margin: 4px 0;
+		  }
+
+		  .time {
+		    font-size: 12px;
+		    color: #888;
+		  }
+		}
+
+		.divider {
+		  width: 1px;
+		  height: 60px;
+		  background: #ddd;
+		  margin: 0 15px;
+		}
+	}
+	.billing-section {
+    	margin-bottom: 25px;
+
+	    .title {
+	      font-weight: 600;
+	      margin-bottom: 12px;
+	      font-size: 15px;
+	      color: #222;
+	    }
+
+	    .billing-table {
+	      width: 100%;
+	      border-collapse: collapse;
+
+	      td {
+	        padding: 12px 0;
+	        font-size: 14px;
+	        border-bottom: 1px solid #f5f5f5;
+
+	        &:first-child {
+	          color: #444;
+	        }
+
+	        &.amount {
+	          text-align: right;
+	          font-weight: 500;
+	          color: #111;
+	        }
+	      }
+
+	      .total-row {
+	        td {
+	          font-weight: 600;
+	          font-size: 15px;
+	        }
+	      }
+	    }
+
+	    .payment-method {
+	      margin-top: 10px;
+	      font-size: 13px;
+	      color: #555;
+	    }
+	}
+	.policy_list{
+		border-bottom: 1px solid $border-color;
+		.list_item{
+			display: flex;
+			gap: 10px;
+			font-size: 12px;
+			margin-bottom: 10px;
+		    align-items: baseline;
+		    .check_icon{
+		    	.check_i{
+		    		color: #e6b047;
+		    		font-size: 14px;
+		    	}
+		    	.close_i{
+		    		color: #db2f46;
+		    		font-size: 14px;
+		    	}
+		    }
+		    p{
+		    	font-size: 14px;
+		    }
+		}
+	}
+	.timeline-wrapper {
+	  padding: 2rem;
+	  position: relative;
+	  max-width: 100%;
+	  overflow-x: auto;
+	}
+
+	.timeline-bar {
+	  position: relative;
+	  top: 65px;
+	  height: 4px;
+	  background: transparent;
+	}
+
+	.progress-line {
+	  width: 100%;
+	  height: 100%;
+	  background: linear-gradient(to right, #d9a92a 60%, #c92430 80%);
+	  z-index: 1;
+	}
+
+	.timeline-points {
+	  display: flex;
+	  justify-content: space-between;
+	  position: relative;
+	}
+
+	.point {
+	  position: relative;
+	  text-align: center;
+	  flex: 1;
+
+	  .top {
+	    margin-bottom: 1rem;
+	    height: 40px;
+
+	    .date {
+	      font-weight: 600;
+	      font-size: 0.85rem;
+	    }
+
+	    .time {
+	      font-size: 0.75rem;
+	      color: #888;
+	    }
+	  }
+
+	  .dot {
+	    width: 14px;
+	    height: 14px;
+	    border-radius: 50%;
+	    margin: 0 auto;
+	    position: relative;
+	    z-index: 2;
+
+	    &.orange {
+	      background-color: #d9a92a;
+	    }
+
+	    &.red {
+	      background-color: #c92430;
+	    }
+
+	    &.gray {
+	      background-color: #ccc;
+	    }
+	  }
+
+	  .bottom {
+	    margin-top: 0.5rem;
+
+	    .label {
+	      font-weight: 500;
+	      font-size: 0.9rem;
+
+	      &.red {
+	        color: #c92430;
+	      }
+	    }
+
+	    .amount {
+	      margin-top: 0.2rem;
+	      font-size: 0.85rem;
+	      color: #333;
+	    }
+	  }
+	}
+}
+
+
+
+

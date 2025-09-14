@@ -1,0 +1,38 @@
+.footer{
+    padding: 45px 0;
+    background: linear-gradient(110deg, $theme-secondary, #00449F 60%);
+    .footer_grid{   
+        .footer_title{
+            font-size: 20px;
+            color: $white;
+            text-transform: uppercase;
+            margin-bottom: 22px;
+            font-weight: 600;
+        }
+        p{
+            font-weight: 200;
+        }
+        .footer_list{
+            display: grid;
+            gap: 15px;
+            li{
+                font-size: 16px;
+                a{
+                    color: $white;
+                }
+            }
+        }
+       
+    }
+    
+    .sub_footer{
+        border-top: 1px solid $white;       
+        padding-top: 15px;
+        margin-top: 30px;
+        text-align: center;
+        p{
+            color: $white;            
+            font-size: 14px;
+        }
+    }
+}

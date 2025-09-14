@@ -1,0 +1,102 @@
+.flight_search{
+    .input-group-text{
+        background-color: transparent !important;
+        border-right: 0;
+        svg{
+            width: 20px;
+            height: 20px;
+            color: $font-light;
+        }
+    }
+    .form-control{
+        border-left:0;
+        padding-left: 0;
+    }
+}
+.flightresult_grid{
+    border-radius: 18px;
+    box-shadow: 0 0 15px rgba($black,0.10);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    h3{
+        font-size: 24px;
+        color: $text-detaukt;
+    }
+    p{
+        font-size: 16px;
+        color: #7A7A7A;
+    }
+    h6{
+        font-size: 16px;
+        color: $text-detaukt;
+    }
+}
+.filter_grid{
+    padding: 20px;
+    border-radius: 18px;
+    box-shadow: 0 0 15px rgba($black,0.10);
+    h4{
+        color: $text-detaukt;
+        font-weight: 700;
+        font-size: 16px;
+    }
+    .filter_header{
+        border-bottom: 1px solid $border-color;
+        padding-bottom: 18px;
+    }
+    .form_group{
+        margin-bottom: 12px;
+    }
+    .filter_body{
+        padding-top: 15px;
+        .form-label{
+            color: #848484;
+        }
+        .form-check-label{
+            font-size: 14px;
+            color: #848484;
+        }
+    }
+
+
+    .rc-slider-dot {
+        display: none;
+    }
+
+    .rc-slider-mark {
+        display: none;
+    }
+
+    .rc-slider-track,
+    .rc-slider-tracks {
+        background-color: $theme-primary;
+    }
+
+    .rc-slider-handle {
+        border-color: $white;
+        background-color: $white;
+        box-shadow: 0 0 10px rgba($black,0.30);
+        opacity: 1;
+    }
+
+    .rc-slider-handle-dragging {
+        box-shadow: 0 0 5px $theme-primary !important;
+        border-color: $theme-primary !important;
+    }
+}
+
+.tranveplan_assistance{
+    padding: 35px 40px;
+    background-color: #004A93;
+    border-radius: 18px;
+    h2{
+        font-size: 48px;
+        font-weight: 700;
+    }
+    p{
+        font-size: 20px;
+        font-weight: 400;
+    }
+}

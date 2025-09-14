@@ -1,0 +1,59 @@
+/*******************
+  04 BUTTON START
+*******************/
+.btn{
+    font-size: 14px;
+    padding: 13px 22px;
+    border-radius: 30px !important;
+    line-height: 1;
+    &.btn-md{
+      padding:10px 15px;
+    }
+    &.btn-rounded{
+      border-radius: 30px;
+    }
+  }
+  @each  $color , $value  in $theme-colors {
+      .btn-#{$color}{
+          color: $white;    
+          background-color: $value !important;   
+          border-color: $value !important;      
+          &:hover{
+            color: $white;
+            background-color: rgba($value,0.9) !important;      
+          }          
+  
+        &.btn_rounded{
+          border-radius: 30px;
+        }
+  
+        &.dropdown-toggle-split{
+          border-top-left-radius: 0;
+          border-bottom-left-radius: 0;
+        }       
+      }    
+      .btn.btn-outline-#{$color}{    
+          background-color:transparent !important;                  
+          border-radius:5px;
+          border:1px solid $value !important;
+          color: $value !important;
+          &:hover,
+          &:focus,
+          &:active{
+            outline-color:$value !important;
+            background-color: $value !important;
+            color:$white !important;          
+          }       
+      }
+      .btn-#{$color}{      
+        background-color: $value;
+        color: $white;  
+        border-radius:5px;  
+      }
+  }
+  
+  .element-buttons{ 
+    .btn{
+      margin:3px 0;
+    }
+  }

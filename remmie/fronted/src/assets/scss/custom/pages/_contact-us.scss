@@ -1,0 +1,27 @@
+.contact_grid{
+    background-color: $bg-grey;
+    border-radius: 18px;
+    padding: 20px;
+    .icon_wrap{
+        width: 52px;
+        height: 52px;
+        border-radius: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        svg{
+            width: 30px;
+            height: 30px;
+        }
+    }
+    .contact_detail{
+        padding-top: 20px;
+        h4{
+            font-weight: 700;
+            font-size: 20px;
+        }
+        p{
+            margin-top: 10px;
+        }
+    }
+}

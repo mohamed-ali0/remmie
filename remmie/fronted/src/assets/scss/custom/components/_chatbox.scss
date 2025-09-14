@@ -1,0 +1,113 @@
+.chatbox_main {
+    position: fixed;
+    bottom: 0;
+    right: 20px;
+    z-index: 999;
+    width: 100%;
+    max-width: 400px;
+
+    .chat_toggle {
+        color: $white;
+        background-color: $theme-primary;
+        padding: 10px 15px;
+        border-radius: 10px;
+        min-width: 220px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+
+        svg {
+            margin-left: 15px;
+        }
+    }
+
+    .livechat_box {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background-color: $white;
+        display: none;
+
+        &.active {
+            display: block;
+        }
+
+        .chat_header {
+            color: $white;
+            background-color: $theme-primary;
+            padding: 10px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chatadmin_profile {
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+
+            .img_wrap {
+                width: 55px;
+
+                img {
+                    width: 100%;
+                }
+            }
+        }
+
+        .livechat_body {
+            padding: 15px;           
+            background-color: $bg-light;
+            .livechat_authbox {
+                border-radius: 10px;
+                border: 1px solid $border-color;
+                padding: 15px;
+            }
+
+            .chat_list {
+                padding-right: 2px;
+                margin-bottom: 15px;
+                max-height: 296px;
+                min-height: 296px;
+                overflow: auto;
+
+                li {
+                    width: 100%;
+
+                    &:nth-child(n+2) {
+                        margin-top: 10px;
+                    }
+                }
+
+                .admin_msg,
+                .user_msg {
+                    width: 100%;
+                    max-width: 60%;
+                    background-color: $white;
+                    padding: 5px 10px;
+                    border-radius: 5px;
+                }
+
+                .user_msg {
+                    margin-left: auto;
+                }
+            }
+
+            .input-group {
+                .form-control {
+                        padding: 10px;
+                        border-top-left-radius: 10px;
+                        border-bottom-left-radius: 10px;
+                }
+                .btn{
+                    border-radius: inherit !important;
+                    border-top-right-radius: 5px !important;
+                    border-bottom-right-radius: 5px !important;
+                    padding: 10px;
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,20 @@
+.input-group-text{
+    border-top-left-radius: 12px;
+    border-bottom-left-radius: 12px;
+}
+.form-control,
+.form-select{
+    padding: 10px 12px;   
+    border-radius: 12px;
+    &::placeholder{
+        color: $black;
+        opacity: 0.3;
+    }
+    &:focus{
+        outline: none;
+        border-color: $border-color;
+    }
+}
+.form-label{
+    font-weight: 600;
+}

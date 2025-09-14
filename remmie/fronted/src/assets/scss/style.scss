@@ -1,0 +1,27 @@
+@charset "UTF-8";
+@import "custom/variables";
+
+
+// Components
+@import "custom/components/common";
+@import "custom/components/breadcrumb";
+@import "custom/components/button";
+@import "custom/components/card";
+@import "custom/components/form";
+@import "custom/components/typography";
+@import "custom/components/header";
+@import "custom/components/footer";
+@import "custom/components/chatbox";
+
+
+@import "custom/pages/index";
+@import "custom/pages/flight";
+@import "custom/pages/contact-us";
+@import "custom/pages/booking";
+@import "custom/pages/staycart";
+@import "custom/pages/stayshistory";
+@import "custom/pages/staysbookingdetails";
+
+// main
+@import "custom/style";
+@import "custom/responsive";

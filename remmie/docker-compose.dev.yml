@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: remmie-mysql-dev
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASS}
+    volumes:
+      - mysql_dev_data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "3306:3306"
+    networks:
+      - remmie-dev-network
+
+  # MongoDB for AI service
+  mongodb:
+    image: mongo:7.0
+    container_name: remmie-mongodb-dev
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
+    volumes:
+      - mongodb_dev_data:/data/db
+    ports:
+      - "27017:27017"
+    networks:
+      - remmie-dev-network
+
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: remmie-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - remmie-dev-network
+
+  # Backend API Service (Development with hot reload)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: remmie-backend-dev
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+      - PORT=5000
+      - DB_HOST=mysql
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_NAME=${DB_NAME}
+      - DB_PREFIX=${DB_PREFIX}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - DUFFEL_ACCESS_TOKENS=${DUFFEL_ACCESS_TOKENS}
+      - DUFFEL_API_URL=${DUFFEL_API_URL}
+      - STAY_BOOKING_BASE_URL=${STAY_BOOKING_BASE_URL}
+      - WHATSAPP_TOKEN=${WHATSAPP_TOKEN}
+      - WHATSAPP_PHONE_ID=${WHATSAPP_PHONE_ID}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - BASE_URL=${BASE_URL}
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ./backend/uploads:/app/uploads
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - remmie-dev-network
+
+  # Python AI Service (Development with hot reload)
+  python-ai:
+    build:
+      context: ./python
+      dockerfile: Dockerfile.dev
+    container_name: remmie-python-ai-dev
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - MONGODB_URI=mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DATABASE}?authSource=admin
+    volumes:
+      - ./python:/app
+    ports:
+      - "5001:5001"
+    depends_on:
+      - mongodb
+    networks:
+      - remmie-dev-network
+
+volumes:
+  mysql_dev_data:
+    driver: local
+  mongodb_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+
+networks:
+  remmie-dev-network:
+    driver: bridge
