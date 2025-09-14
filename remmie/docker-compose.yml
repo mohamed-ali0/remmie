@@ -126,6 +126,12 @@ services:
     build:
       context: ./fronted
       dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL}
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL}
+        - VITE_PYTHON_API_URL=${VITE_PYTHON_API_URL}
+        - VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
+        - VITE_STRIPE_PUBLIC_KEY=${VITE_STRIPE_PUBLIC_KEY}
     container_name: remmie-frontend
     restart: unless-stopped
     environment:
