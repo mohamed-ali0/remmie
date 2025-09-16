@@ -134,10 +134,6 @@ services:
         - VITE_STRIPE_PUBLIC_KEY=${VITE_STRIPE_PUBLIC_KEY}
     container_name: remmie-frontend
     restart: unless-stopped
-    environment:
-      - VITE_API_URL=${VITE_API_URL}
-      - VITE_STRIPE_PUBLIC_KEY=${VITE_STRIPE_PUBLIC_KEY}
-      - VITE_PYTHON_API_URL=${VITE_PYTHON_API_URL}
     depends_on:
       - backend
       - python-ai
@@ -167,19 +163,7 @@ services:
     networks:
       - remmie-network
 
-volumes:
-  mysql_data:
-    driver: local
-  mongodb_data:
-    driver: local
-  redis_data:
-    driver: local
-
-networks:
-  remmie-network:
-    driver: bridge
-
-# Add this entire service block to your docker-compose.yml
+  # phpMyAdmin Service
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
     container_name: remmie-phpmyadmin
@@ -193,3 +177,17 @@ networks:
       - remmie-network
     depends_on:
       - mysql
+
+volumes:
+  mysql_data:
+    driver: local
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
+  n8n_data:
+    driver: local
+
+networks:
+  remmie-network:
+    driver: bridge
