@@ -7,51 +7,109 @@ require('dotenv').config();
 // Python AI service URL
 const PYTHON_AI_URL = process.env.PYTHON_AI_URL || 'http://python-ai:5001';
 
-// Function to get AI response from Python service
-async function getAIResponse(message, phoneNumber) {
+// Function to load user context (chat history, flight history, profile)
+async function loadUserContext(phoneNumber) {
     try {
-        console.log('=== CALLING PYTHON AI SERVICE ===');
+        console.log('=== LOADING USER CONTEXT ===');
+        console.log('Phone Number:', phoneNumber);
+        
+        const userContext = {
+            phoneNumber: phoneNumber,
+            chatHistory: [],
+            flightHistory: [],
+            userProfile: {}
+        };
+
+        // Try to get user from database (if they've used the web app)
+        try {
+            const [userRows] = await pool.execute(
+                `SELECT * FROM ${dbPrefix}users WHERE phone_number = ? OR recipient_id = ? LIMIT 1`,
+                [phoneNumber, phoneNumber]
+            );
+            
+            if (userRows.length > 0) {
+                userContext.userProfile = {
+                    firstName: userRows[0].first_name || '',
+                    lastName: userRows[0].last_name || '',
+                    email: userRows[0].email || '',
+                    userId: userRows[0].id
+                };
+                
+                // Get their flight booking history
+                const [bookingRows] = await pool.execute(
+                    `SELECT * FROM ${dbPrefix}bookings WHERE user_id = ? OR phone_number = ? ORDER BY created_at DESC LIMIT 10`,
+                    [userRows[0].id, phoneNumber]
+                );
+                userContext.flightHistory = bookingRows;
+            }
+        } catch (dbError) {
+            console.warn('Could not load user data from database:', dbError.message);
+        }
+
+        // Get WhatsApp conversation history (from our conversation state table)
+        try {
+            const [conversationRows] = await pool.execute(
+                `SELECT * FROM ${dbPrefix}conversations WHERE phone_number = ? LIMIT 1`,
+                [phoneNumber]
+            );
+            if (conversationRows.length > 0) {
+                userContext.conversationState = conversationRows[0];
+            }
+        } catch (convError) {
+            console.warn('Could not load conversation state:', convError.message);
+        }
+        
+        console.log('User context loaded:', userContext);
+        return userContext;
+        
+    } catch (error) {
+        console.error('Error loading user context:', error.message);
+        return {
+            phoneNumber: phoneNumber,
+            chatHistory: [],
+            flightHistory: [],
+            userProfile: {}
+        };
+    }
+}
+
+// Function to send message to N8N with context
+async function sendToN8N(message, phoneNumber, userContext) {
+    try {
+        console.log('=== CALLING N8N WEBHOOK ===');
         console.log('Message:', message);
         console.log('Phone Number:', phoneNumber);
         
-        const response = await axios.post(`${PYTHON_AI_URL}/chat`, {
+        const payload = {
+            action: 'sendMessage',
+            platform: 'whatsapp',
+            phoneNumber: phoneNumber,
             message: message,
-            recipient_id: phoneNumber
-        }, {
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            timeout: 30000 // 30 second timeout
-        });
+            userContext: userContext,
+            timestamp: new Date().toISOString()
+        };
         
-        console.log('AI Response:', response.data.response);
-        return response.data.response;
+        const response = await axios.post(
+            'https://remmie.co:5678/webhook/3176c1ff-171f-4881-9c93-923ad256f38a/chat',
+            payload,
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Instance-Id': '2da9bf4f1ece7387f7a2c437b11f80fd9c2f46da08bd0e4f6f9aed86381a3f37'
+                },
+                timeout: 30000 // 30 second timeout
+            }
+        );
+        
+        console.log('N8N Response:', response.data);
+        return response.data?.output || "I'm processing your request. Please wait a moment...";
         
     } catch (error) {
-        console.error('Error calling Python AI service:', error.message);
+        console.error('Error calling N8N webhook:', error.message);
         console.error('Error details:', error.response?.data);
         
         // Return fallback message
         return "I'm having trouble processing your request right now. Please try again in a moment, or contact our support team for assistance.";
-    }
-}
-
-// Function to get chat history for a user
-async function getChatHistory(phoneNumber) {
-    try {
-        console.log('=== GETTING CHAT HISTORY ===');
-        console.log('Phone Number:', phoneNumber);
-        
-        const response = await axios.get(`${PYTHON_AI_URL}/chat-history/${phoneNumber}`, {
-            timeout: 10000 // 10 second timeout
-        });
-        
-        console.log('Chat History:', response.data);
-        return response.data.messages || [];
-        
-    } catch (error) {
-        console.error('Error getting chat history:', error.message);
-        return []; // Return empty array if no history
     }
 }
 
@@ -624,15 +682,15 @@ async function wpWebhook(req, res) {
         console.log('From:', phoneNumber);
         console.log('Message:', userMessage);
 
-        // Load chat history before processing
-        const chatHistory = await getChatHistory(phoneNumber);
-        console.log('Loaded chat history:', chatHistory.length, 'messages');
+        // Load user context (chat history, flight history, etc.)
+        const userContext = await loadUserContext(phoneNumber);
+        console.log('Loaded user context:', userContext);
 
-        // Get AI response
-        const aiResponse = await getAIResponse(userMessage, phoneNumber);
+        // Send to N8N with context
+        const n8nResponse = await sendToN8N(userMessage, phoneNumber, userContext);
         
-        // Send AI response back to user
-        await sendWhatsAppMessage(phoneNumber, aiResponse);
+        // Send N8N response back to user
+        await sendWhatsAppMessage(phoneNumber, n8nResponse);
 
         res.sendStatus(200);
     } catch (error) {

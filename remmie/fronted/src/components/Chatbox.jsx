@@ -59,15 +59,18 @@ export default function Chatbox() {
         try {
             console.log('Loading chat history for user:', userId);
             
-            // Try to load chat history from Python AI service
-            const pythonApiUrl = import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:5001';
-            const response = await axios.get(`${pythonApiUrl}/chat-history/${userId}`);
+            // Load chat history from backend bookings-chat API
+            const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/bookings-chat/find-user-message`, {
+                userId: userId
+            }, {
+                headers: { Authorization: `Bearer ${getToken()}` }
+            });
             
             if (response.data && response.data.messages && response.data.messages.length > 0) {
-                // Convert Python AI format to frontend format
+                // Convert backend format to frontend format
                 const formattedMessages = response.data.messages.map(msg => ({
-                    sender: msg.role === 'user' ? 'user' : 'bot',
-                    text: msg.content
+                    sender: msg.sender,
+                    text: msg.message
                 }));
                 setMessages(formattedMessages);
                 console.log('Loaded', formattedMessages.length, 'messages from history');
@@ -110,32 +113,64 @@ export default function Chatbox() {
                 userId: userId
             });
 
-            // Step 2: Send message to Python AI service
-            console.log('Sending message to Python AI:', inputMessage);
+            // Step 2: Get user's flight history and chat context for N8N
+            let userContext = {};
+            try {
+                // Get chat history
+                const chatHistoryResponse = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/bookings-chat/find-user-message`, {
+                    userId: userId
+                }, {
+                    headers: { Authorization: `Bearer ${getToken()}` }
+                });
+                
+                // Get flight booking history
+                const flightHistoryResponse = await axios.post(`${import.meta.env.VITE_API_URL}/booking/get-user-booking-list`, {}, {
+                    headers: { Authorization: `Bearer ${getToken()}` }
+                });
+                
+                userContext = {
+                    chatHistory: chatHistoryResponse.data?.messages || [],
+                    flightHistory: flightHistoryResponse.data?.bookings || [],
+                    userProfile: {
+                        firstName: localStorage.getItem('first_name') || '',
+                        lastName: localStorage.getItem('last_name') || '',
+                        email: localStorage.getItem('email') || ''
+                    }
+                };
+            } catch (contextError) {
+                console.warn('Could not load user context:', contextError);
+            }
+
+            // Step 3: Send message to N8N with context
+            const payload = {
+                action: 'sendMessage',
+                sessionId: sessionId,
+                chatInput: inputMessage,
+                userId: userId,
+                userContext: userContext // Include user context for N8N
+            };
+
+            console.log('Sending to N8N with context:', payload);
             
-            const pythonApiUrl = import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:5001';
             const res = await axios.post(
-                `${pythonApiUrl}/chat`,
-                {
-                    message: inputMessage,
-                    recipient_id: userId
-                },
+                'https://remmie.co:5678/webhook/3176c1ff-171f-4881-9c93-923ad256f38a/chat',
+                payload,
                 {
                     headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    timeout: 30000 // 30 second timeout
+                        'Content-Type': 'application/json',
+                        'X-Instance-Id': '2da9bf4f1ece7387f7a2c437b11f80fd9c2f46da08bd0e4f6f9aed86381a3f37'
+                    }
                 }
             );
 
             const botMsg = {
                 sender: 'bot',
-                text: res?.data?.response || '🤖 Sorry, I had trouble processing your request.'
+                text: res?.data?.output || '🤖 (no reply from bot)'
             };
 
             setMessages(prev => [...prev, botMsg]);
             
-            // Step 3: Store BOT reply to backend
+            // Step 4: Store BOT reply to backend
             await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/bookings-chat/store-message`, {
                 sessionId: sessionId,
                 message: botMsg.text,
