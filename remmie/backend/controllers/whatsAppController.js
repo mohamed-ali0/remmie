@@ -389,6 +389,17 @@ async function sendWhatsAppMessage(phoneNumber, message) {
             phoneId: process.env.WHATSAPP_PHONE_ID,
             tokenLength: process.env.WHATSAPP_TOKEN?.length
         });
+        
+        // Check if token is expired
+        if (error.response?.status === 401 && error.response?.data?.error?.error_subcode === 463) {
+            console.error('🚨 WHATSAPP TOKEN EXPIRED! 🚨');
+            console.error('Please renew your WhatsApp Business API token:');
+            console.error('1. Go to https://developers.facebook.com/');
+            console.error('2. Navigate to your WhatsApp Business API app');
+            console.error('3. Generate a new access token');
+            console.error('4. Update WHATSAPP_TOKEN in your .env file');
+            console.error('5. Restart the backend service');
+        }
     }
 }
 
