@@ -134,6 +134,7 @@ services:
         - VITE_PYTHON_API_URL=${VITE_PYTHON_API_URL}
         - VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
         - VITE_STRIPE_PUBLIC_KEY=${VITE_STRIPE_PUBLIC_KEY}
+        - VITE_WHATSAPP_CONTACT_NUMBER=${VITE_WHATSAPP_CONTACT_NUMBER}
     container_name: remmie-frontend
     restart: unless-stopped
     depends_on:

@@ -20,10 +20,10 @@ export default function Tolkinstently() {
                         </div>
                         <div className='tolkinstently_detail'>
                             <h4 className='text_success'>Talk to Remmie on WhatsApp!</h4>
-                            <p>Send a message to [number], feel free to 
+                            <p>Send a message to {import.meta.env.VITE_WHATSAPP_CONTACT_NUMBER || '+1 555 188 7364'}, feel free to 
                             send a voice note too!</p>
                             <div className='button_group'>
-                                 <a className='btn btn-success' href='https://wa.me/+15556432719' target='_blank' rel='noopener noreferrer'>
+                                 <a className='btn btn-success' href={`https://wa.me/${import.meta.env.VITE_WHATSAPP_CONTACT_NUMBER || '+15551887364'}`} target='_blank' rel='noopener noreferrer'>
                                     Talk with Remmie on WhatsApp
                                   </a>
                                 {/*<Link className='btn btn-success'>Talk with Remmie on WhatsApp</Link>*/}
