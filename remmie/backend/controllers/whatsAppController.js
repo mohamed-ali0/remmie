@@ -22,25 +22,39 @@ async function loadUserContext(phoneNumber) {
 
         // Try to get user from database (if they've used the web app)
         try {
+            // First check by phone number, then by any matching phone format
+            const cleanPhone = phoneNumber.replace(/\D/g, ''); // Remove non-digits
             const [userRows] = await pool.execute(
-                `SELECT * FROM ${dbPrefix}users WHERE phone_number = ? OR recipient_id = ? LIMIT 1`,
-                [phoneNumber, phoneNumber]
+                `SELECT * FROM ${dbPrefix}users WHERE 
+                 phone_number = ? OR 
+                 mobile = ? OR 
+                 REPLACE(REPLACE(mobile, '+', ''), ' ', '') = ? OR
+                 recipient_id = ?
+                 LIMIT 1`,
+                [phoneNumber, phoneNumber, cleanPhone, phoneNumber]
             );
             
             if (userRows.length > 0) {
+                const user = userRows[0];
                 userContext.userProfile = {
-                    firstName: userRows[0].first_name || '',
-                    lastName: userRows[0].last_name || '',
-                    email: userRows[0].email || '',
-                    userId: userRows[0].id
+                    firstName: user.first_name || '',
+                    lastName: user.last_name || '',
+                    email: user.email || '',
+                    mobile: user.mobile || user.phone_number || '',
+                    userId: user.id,
+                    fullName: `${user.first_name || ''} ${user.last_name || ''}`.trim()
                 };
                 
                 // Get their flight booking history
                 const [bookingRows] = await pool.execute(
                     `SELECT * FROM ${dbPrefix}bookings WHERE user_id = ? OR phone_number = ? ORDER BY created_at DESC LIMIT 10`,
-                    [userRows[0].id, phoneNumber]
+                    [user.id, phoneNumber]
                 );
                 userContext.flightHistory = bookingRows;
+                
+                console.log('Found user profile for WhatsApp:', userContext.userProfile);
+            } else {
+                console.log('No user profile found for phone number:', phoneNumber);
             }
         } catch (dbError) {
             console.warn('Could not load user data from database:', dbError.message);
@@ -80,14 +94,17 @@ async function sendToN8N(message, phoneNumber, userContext) {
         console.log('Message:', message);
         console.log('Phone Number:', phoneNumber);
         
+        // Use the same payload structure as frontend
         const payload = {
             action: 'sendMessage',
+            sessionId: phoneNumber, // Use phone number as session ID
+            chatInput: message,
+            userId: phoneNumber,
             platform: 'whatsapp',
-            phoneNumber: phoneNumber,
-            message: message,
-            userContext: userContext,
-            timestamp: new Date().toISOString()
+            userContext: userContext
         };
+        
+        console.log('N8N Payload:', JSON.stringify(payload, null, 2));
         
         const response = await axios.post(
             'https://remmie.co:5678/webhook/3176c1ff-171f-4881-9c93-923ad256f38a/chat',

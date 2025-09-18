@@ -116,6 +116,11 @@ export default function Chatbox() {
             // Step 2: Get user's flight history and chat context for N8N
             let userContext = {};
             try {
+                // Get user profile from backend API
+                const userProfileResponse = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/auth/user-info`, {}, {
+                    headers: { Authorization: `Bearer ${getToken()}` }
+                });
+
                 // Get chat history
                 const chatHistoryResponse = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/bookings-chat/find-user-message`, {
                     userId: userId
@@ -128,17 +133,36 @@ export default function Chatbox() {
                     headers: { Authorization: `Bearer ${getToken()}` }
                 });
                 
+                const userProfile = userProfileResponse.data?.data || {};
+                
                 userContext = {
                     chatHistory: chatHistoryResponse.data?.messages || [],
                     flightHistory: flightHistoryResponse.data?.bookings || [],
                     userProfile: {
-                        firstName: localStorage.getItem('first_name') || '',
-                        lastName: localStorage.getItem('last_name') || '',
-                        email: localStorage.getItem('email') || ''
+                        firstName: userProfile.first_name || localStorage.getItem('first_name') || '',
+                        lastName: userProfile.last_name || localStorage.getItem('last_name') || '',
+                        email: userProfile.email || localStorage.getItem('email') || '',
+                        mobile: userProfile.mobile || '',
+                        userId: userId,
+                        fullName: `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim()
                     }
                 };
+                
+                console.log('User context for N8N:', userContext);
             } catch (contextError) {
                 console.warn('Could not load user context:', contextError);
+                // Fallback to localStorage
+                userContext = {
+                    chatHistory: [],
+                    flightHistory: [],
+                    userProfile: {
+                        firstName: localStorage.getItem('first_name') || '',
+                        lastName: localStorage.getItem('last_name') || '',
+                        email: localStorage.getItem('email') || '',
+                        userId: userId,
+                        fullName: `${localStorage.getItem('first_name') || ''} ${localStorage.getItem('last_name') || ''}`.trim()
+                    }
+                };
             }
 
             // Step 3: Send message to N8N with context
