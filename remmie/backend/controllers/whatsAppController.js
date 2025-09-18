@@ -87,6 +87,35 @@ async function loadUserContext(phoneNumber) {
     }
 }
 
+// Function to send welcome message to new users
+async function sendWelcomeMessage(phoneNumber, userProfile) {
+    try {
+        const userName = userProfile.fullName || userProfile.firstName || 'friend';
+        const welcomeMessage = `Hello ${userName}! 👋 Welcome to Remmie Travel Assistant. I'm here to help you find the best flights and accommodations for your next adventure. How can I assist you today?`;
+        
+        console.log(`Sending welcome message to ${phoneNumber}: ${welcomeMessage}`);
+        await sendWhatsAppMessage(phoneNumber, welcomeMessage);
+        return true;
+    } catch (error) {
+        console.error('Error sending welcome message:', error.message);
+        return false;
+    }
+}
+
+// Function to send error message when N8N fails
+async function sendErrorMessage(phoneNumber) {
+    try {
+        const errorMessage = "We are facing a technical issue at this moment. Please try again after some time. Our team is working to resolve this quickly. Thank you for your patience! 🙏";
+        
+        console.log(`Sending error message to ${phoneNumber}`);
+        await sendWhatsAppMessage(phoneNumber, errorMessage);
+        return true;
+    } catch (error) {
+        console.error('Error sending error message:', error.message);
+        return false;
+    }
+}
+
 // Function to send message to N8N with context
 async function sendToN8N(message, phoneNumber, userContext) {
     try {
@@ -125,8 +154,8 @@ async function sendToN8N(message, phoneNumber, userContext) {
         console.error('Error calling N8N webhook:', error.message);
         console.error('Error details:', error.response?.data);
         
-        // Return fallback message
-        return "I'm having trouble processing your request right now. Please try again in a moment, or contact our support team for assistance.";
+        // Throw error to be handled by caller
+        throw error;
     }
 }
 
@@ -703,11 +732,35 @@ async function wpWebhook(req, res) {
         const userContext = await loadUserContext(phoneNumber);
         console.log('Loaded user context:', userContext);
 
-        // Send to N8N with context
-        const n8nResponse = await sendToN8N(userMessage, phoneNumber, userContext);
+        // Check if this is a new user or greeting message
+        const isNewUser = !userContext.conversationState || userContext.conversationState.step === 'new' || userContext.conversationState.step === 'awaiting_category';
+        const hasUserProfile = userContext.userProfile && (userContext.userProfile.firstName || userContext.userProfile.fullName);
+        const isGreeting = userMessage.toLowerCase().includes('hi') || userMessage.toLowerCase().includes('hello') || userMessage.toLowerCase().includes('hey');
         
-        // Send N8N response back to user
-        await sendWhatsAppMessage(phoneNumber, n8nResponse);
+        // Send welcome message for users with profile info when they greet
+        if (isGreeting && hasUserProfile) {
+            console.log('Sending welcome message to user with profile');
+            await sendWelcomeMessage(phoneNumber, userContext.userProfile);
+        }
+        // Send generic welcome for new users without profile
+        else if (isGreeting && isNewUser && !hasUserProfile) {
+            console.log('Sending generic welcome message to new user');
+            const genericWelcome = "Hello! 👋 Welcome to Remmie Travel Assistant. I'm here to help you find the best flights and accommodations for your next adventure. How can I assist you today?";
+            await sendWhatsAppMessage(phoneNumber, genericWelcome);
+        }
+
+        // Send to N8N with context
+        try {
+            const n8nResponse = await sendToN8N(userMessage, phoneNumber, userContext);
+            
+            // Send N8N response back to user
+            await sendWhatsAppMessage(phoneNumber, n8nResponse);
+        } catch (n8nError) {
+            console.error('N8N failed, sending error message to user:', n8nError.message);
+            
+            // Send error message to user when N8N fails
+            await sendErrorMessage(phoneNumber);
+        }
 
         res.sendStatus(200);
     } catch (error) {

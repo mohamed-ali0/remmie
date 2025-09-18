@@ -70,12 +70,13 @@ const findMessage = async (req, res) => {
 
     const whereClause = `WHERE ${conditions.join(" OR ")}`;
 
-    // Step 1: Get latest 2 session_ids
+    // Step 1: Get latest 2 session_ids (fix DISTINCT + ORDER BY issue)
     const [sessions] = await pool.execute(
-      `SELECT DISTINCT session_id 
-       FROM trvl_bookings_chat_messages 
+      `SELECT session_id, MAX(id) as max_id
+       FROM ${dbPrefix}bookings_chat_messages 
        ${whereClause} 
-       ORDER BY id DESC 
+       GROUP BY session_id
+       ORDER BY max_id DESC 
        LIMIT 2`,
       values
     );

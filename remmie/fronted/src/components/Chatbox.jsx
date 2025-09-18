@@ -66,14 +66,22 @@ export default function Chatbox() {
                 headers: { Authorization: `Bearer ${getToken()}` }
             });
             
-            if (response.data && response.data.messages && response.data.messages.length > 0) {
+            if (response.data && response.data.sessions) {
                 // Convert backend format to frontend format
-                const formattedMessages = response.data.messages.map(msg => ({
-                    sender: msg.sender,
-                    text: msg.message
-                }));
-                setMessages(formattedMessages);
-                console.log('Loaded', formattedMessages.length, 'messages from history');
+                const allMessages = [];
+                Object.values(response.data.sessions).forEach(sessionMessages => {
+                    sessionMessages.forEach(msg => {
+                        allMessages.push({
+                            sender: msg.sender,
+                            text: msg.message
+                        });
+                    });
+                });
+                
+                if (allMessages.length > 0) {
+                    setMessages(allMessages);
+                    console.log('Loaded', allMessages.length, 'messages from history');
+                }
             } else {
                 // No history found, show welcome message
                 const firstName = localStorage.getItem('first_name') || "";
@@ -135,8 +143,22 @@ export default function Chatbox() {
                 
                 const userProfile = userProfileResponse.data?.data || {};
                 
+                // Process chat history from sessions format
+                const chatHistory = [];
+                if (chatHistoryResponse.data?.sessions) {
+                    Object.values(chatHistoryResponse.data.sessions).forEach(sessionMessages => {
+                        sessionMessages.forEach(msg => {
+                            chatHistory.push({
+                                sender: msg.sender,
+                                message: msg.message,
+                                created_at: msg.created_at
+                            });
+                        });
+                    });
+                }
+
                 userContext = {
-                    chatHistory: chatHistoryResponse.data?.messages || [],
+                    chatHistory: chatHistory,
                     flightHistory: flightHistoryResponse.data?.bookings || [],
                     userProfile: {
                         firstName: userProfile.first_name || localStorage.getItem('first_name') || '',
