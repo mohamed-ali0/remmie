@@ -26,12 +26,10 @@ async function loadUserContext(phoneNumber) {
             const cleanPhone = phoneNumber.replace(/\D/g, ''); // Remove non-digits
             const [userRows] = await pool.execute(
                 `SELECT * FROM ${dbPrefix}users WHERE 
-                 phone_number = ? OR 
                  mobile = ? OR 
-                 REPLACE(REPLACE(mobile, '+', ''), ' ', '') = ? OR
-                 recipient_id = ?
+                 REPLACE(REPLACE(mobile, '+', ''), ' ', '') = ?
                  LIMIT 1`,
-                [phoneNumber, phoneNumber, cleanPhone, phoneNumber]
+                [phoneNumber, cleanPhone]
             );
             
             if (userRows.length > 0) {
@@ -47,8 +45,8 @@ async function loadUserContext(phoneNumber) {
                 
                 // Get their flight booking history
                 const [bookingRows] = await pool.execute(
-                    `SELECT * FROM ${dbPrefix}bookings WHERE user_id = ? OR phone_number = ? ORDER BY created_at DESC LIMIT 10`,
-                    [user.id, phoneNumber]
+                    `SELECT * FROM ${dbPrefix}bookings WHERE user_id = ? ORDER BY created_at DESC LIMIT 10`,
+                    [user.id]
                 );
                 userContext.flightHistory = bookingRows;
                 
@@ -360,6 +358,12 @@ async function sendWhatsAppMessage(phoneNumber, message) {
      //            JSON.stringify(errorArray) + '\n'
      //        );
     try {
+        console.log('=== SENDING WHATSAPP MESSAGE ===');
+        console.log('Phone ID:', process.env.WHATSAPP_PHONE_ID);
+        console.log('Token length:', process.env.WHATSAPP_TOKEN?.length);
+        console.log('To:', phoneNumber);
+        console.log('Message:', message);
+        
         await axios.post(
             `https://graph.facebook.com/v17.0/${process.env.WHATSAPP_PHONE_ID}/messages`,
             {
@@ -375,8 +379,16 @@ async function sendWhatsAppMessage(phoneNumber, message) {
                 }
             }
         );
+        console.log('WhatsApp message sent successfully');
     } catch (error) {
         console.error('WhatsApp message error:', error.message);
+        console.error('WhatsApp error details:', {
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            data: error.response?.data,
+            phoneId: process.env.WHATSAPP_PHONE_ID,
+            tokenLength: process.env.WHATSAPP_TOKEN?.length
+        });
     }
 }
 

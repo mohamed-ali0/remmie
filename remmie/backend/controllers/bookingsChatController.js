@@ -68,7 +68,8 @@ const findMessage = async (req, res) => {
       
     }
 
-    const whereClause = `WHERE ${conditions.join(" OR ")}`;
+    // Only add WHERE clause if we have conditions
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" OR ")}` : '';
 
     // Step 1: Get latest 2 session_ids (fix DISTINCT + ORDER BY issue)
     const [sessions] = await pool.execute(
