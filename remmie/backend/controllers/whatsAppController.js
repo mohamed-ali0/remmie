@@ -238,21 +238,31 @@ async function sendInteractiveList(phoneNumber, message, sections) {
      //        );
 
     try {
+        const payload = {
+            messaging_product: 'whatsapp',
+            to: phoneNumber,
+            type: 'interactive',
+            interactive: {
+                type: 'list',
+                header: {
+                    type: 'text',
+                    text: 'Remmie Travel Assistant'
+                },
+                body: { text: message },
+                action: {
+                    button: 'Select Option',
+                    sections: sections
+                }
+            }
+        };
+
+        // Debug logging
+        console.log('=== SENDING INTERACTIVE LIST ===');
+        console.log('Payload:', JSON.stringify(payload, null, 2));
+        
         await axios.post(
             `https://graph.facebook.com/v17.0/${process.env.WHATSAPP_PHONE_ID}/messages`,
-            {
-                messaging_product: 'whatsapp',
-                to: phoneNumber,
-                type: 'interactive',
-                interactive: {
-                    type: 'list',
-                    body: { text: message },
-                    action: {
-                        button: 'Select Option',
-                        sections
-                    }
-                }
-            },
+            payload,
             {
                 headers: {
                     Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
@@ -264,24 +274,28 @@ async function sendInteractiveList(phoneNumber, message, sections) {
             message: 'sucess',
         }) + '\n');
     } catch (error) {
-            const errorArray = [
-                { key: 'error', value: 'WhatsApp interactive list error' },
-                { key: 'message', value: error.message },
-                { key: 'stack', value: error.stack },
-                { key: 'response', value: error.response?.data || null },
+        console.error('=== INTERACTIVE LIST ERROR ===');
+        console.error('Error message:', error.message);
+        console.error('Response data:', error.response?.data);
+        console.error('Response status:', error.response?.status);
+        console.error('Phone number:', phoneNumber);
+        console.error('Message:', message);
+        console.error('Sections:', JSON.stringify(sections, null, 2));
+        
+        const errorArray = [
+            { key: 'error', value: 'WhatsApp interactive list error' },
+            { key: 'message', value: error.message },
+            { key: 'response', value: error.response?.data || null },
+            { key: 'status', value: error.response?.status || null },
+            { key: 'phoneNumber', value: phoneNumber },
+            { key: 'messageText', value: message },
+            { key: 'sections', value: sections },
+        ];
 
-                { key: 'phoneNumber', value: phoneNumber },
-                { key: 'message', value: message },
-                { key: 'sections', value: sections },
-            ];
-
-            console.error(errorArray);
-
-            // await fs.appendFile(
-            //     'error_log.txt',
-            //     JSON.stringify(errorArray) + '\n'
-            // );
-
+        await fs.appendFile(
+            'error_log.txt',
+            JSON.stringify(errorArray) + '\n'
+        );
     }
 }
 
