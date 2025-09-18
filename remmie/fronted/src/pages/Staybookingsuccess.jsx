@@ -79,7 +79,7 @@ export default function Staybookingsuccess() {
 
             // Send to API
             const orderResponse = await axios.post(
-              'https://remmie.co:5000/api/stays/create-conform-order',
+              `${import.meta.env.VITE_API_URL}/stays/create-conform-order`,
               confirmOrderPayload,
               { headers: { 'Content-Type': 'application/json' } }
             );

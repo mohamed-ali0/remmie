@@ -31,7 +31,7 @@ export default function StaysBookingDetails() {
       setError(null);
       
       const response = await axios.post(
-        'https://remmie.co:5000/api/booking/get-user-Stays-single-booking',
+        `${import.meta.env.VITE_API_URL}/booking/get-user-Stays-single-booking`,
         { booking_ref: bookingRef },
         { 
           headers: { 
