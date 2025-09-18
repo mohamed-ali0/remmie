@@ -515,9 +515,20 @@ async function wpWebhook(req, res) {
         const token = req.query['hub.verify_token'];
         const challenge = req.query['hub.challenge'];
 
+        // Debug logging
+        console.log('=== WEBHOOK VERIFICATION DEBUG ===');
+        console.log('Mode:', mode);
+        console.log('Received token:', token);
+        console.log('Expected token:', VERIFY_TOKEN);
+        console.log('Challenge:', challenge);
+        console.log('Token match:', token === VERIFY_TOKEN);
+        console.log('Mode match:', mode === 'subscribe');
+
         if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+            console.log('SUCCESS: Webhook verification passed');
             return res.status(200).send(challenge);
         } else {
+            console.log('FAILED: Webhook verification failed');
             return res.sendStatus(403);
         }
     }
