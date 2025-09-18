@@ -4,6 +4,57 @@ const fs = require('fs').promises;
 const { pool, dbPrefix } = require('../config/db');
 require('dotenv').config();
 
+// Python AI service URL
+const PYTHON_AI_URL = process.env.PYTHON_AI_URL || 'http://python-ai:5001';
+
+// Function to get AI response from Python service
+async function getAIResponse(message, phoneNumber) {
+    try {
+        console.log('=== CALLING PYTHON AI SERVICE ===');
+        console.log('Message:', message);
+        console.log('Phone Number:', phoneNumber);
+        
+        const response = await axios.post(`${PYTHON_AI_URL}/chat`, {
+            message: message,
+            recipient_id: phoneNumber
+        }, {
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            timeout: 30000 // 30 second timeout
+        });
+        
+        console.log('AI Response:', response.data.response);
+        return response.data.response;
+        
+    } catch (error) {
+        console.error('Error calling Python AI service:', error.message);
+        console.error('Error details:', error.response?.data);
+        
+        // Return fallback message
+        return "I'm having trouble processing your request right now. Please try again in a moment, or contact our support team for assistance.";
+    }
+}
+
+// Function to get chat history for a user
+async function getChatHistory(phoneNumber) {
+    try {
+        console.log('=== GETTING CHAT HISTORY ===');
+        console.log('Phone Number:', phoneNumber);
+        
+        const response = await axios.get(`${PYTHON_AI_URL}/chat-history/${phoneNumber}`, {
+            timeout: 10000 // 10 second timeout
+        });
+        
+        console.log('Chat History:', response.data);
+        return response.data.messages || [];
+        
+    } catch (error) {
+        console.error('Error getting chat history:', error.message);
+        return []; // Return empty array if no history
+    }
+}
+
 // Create tables
 async function createTables() {
     await pool.execute(`
@@ -557,27 +608,54 @@ async function wpWebhook(req, res) {
         }
 
         const phoneNumber = message.from;
-        let text, interactive;
+        let userMessage;
+        
         if (message.text) {
-            text = message.text.body;
+            userMessage = message.text.body;
         } else if (message.interactive?.list_reply) {
-            interactive = message.interactive.list_reply.id;
+            userMessage = message.interactive.list_reply.title; // Use the selected option title
+        } else if (message.interactive?.button_reply) {
+            userMessage = message.interactive.button_reply.title;
         } else {
             return res.sendStatus(200);
         }
 
+        console.log('=== PROCESSING WHATSAPP MESSAGE ===');
+        console.log('From:', phoneNumber);
+        console.log('Message:', userMessage);
+
+        // Load chat history before processing
+        const chatHistory = await getChatHistory(phoneNumber);
+        console.log('Loaded chat history:', chatHistory.length, 'messages');
+
+        // Get AI response
+        const aiResponse = await getAIResponse(userMessage, phoneNumber);
+        
+        // Send AI response back to user
+        await sendWhatsAppMessage(phoneNumber, aiResponse);
+
+        res.sendStatus(200);
+    } catch (error) {
+        console.error('Webhook error:', error.message);
+        res.sendStatus(500);
+    }
+}
+
+// Keep the old conversation flow as backup (commented out)
+/*
+        // OLD HARDCODED CONVERSATION FLOW - REPLACED WITH AI
         const state = await getConversationState(phoneNumber);
 
-        // Conversation Flow
         if (text?.toLowerCase() === 'hi' || state.step === 'new') {
-            await updateConversationState(phoneNumber, { step: 'awaiting_category' });
-            await sendInteractiveList(phoneNumber, 'Please choose a category:', [{
-                title: 'Categories',
-                rows: [
-                    { id: 'flights', title: 'Flights' },
-                    { id: 'hotels', title: 'Hotels' }
-                ]
-            }]);
+            // OLD CODE - COMMENTED OUT
+            // await updateConversationState(phoneNumber, { step: 'awaiting_category' });
+            // await sendInteractiveList(phoneNumber, 'Please choose a category:', [{
+            //     title: 'Categories',
+            //     rows: [
+            //         { id: 'flights', title: 'Flights' },
+            //         { id: 'hotels', title: 'Hotels' }
+            //     ]
+            // }]);
         } else if (state.step === 'awaiting_category' && interactive === 'flights') {
             await updateConversationState(phoneNumber, { step: 'awaiting_flight_details' });
             await sendWhatsAppMessage(phoneNumber,
@@ -1022,13 +1100,9 @@ async function wpWebhook(req, res) {
                 await pool.execute(`DELETE FROM ${dbPrefix}conversations WHERE phone_number = ?`, [phoneNumber]);
             }
         }
+*/
 
-        res.sendStatus(200);
-    } catch (error) {
-        console.error('Webhook error:', error.message);
-        res.sendStatus(500);
-    }
-}
+// End of old conversation flow - now using AI service above
 
 // Initialize tables
 createTables().catch(console.error);

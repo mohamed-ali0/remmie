@@ -88,6 +88,7 @@ services:
       - VERIFY_TOKEN=${VERIFY_TOKEN}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - BASE_URL=${BASE_URL}
+      - PYTHON_AI_URL=http://python-ai:5001
     volumes:
       - ./backend/uploads:/app/uploads
     depends_on:

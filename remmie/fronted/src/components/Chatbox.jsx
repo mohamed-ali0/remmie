@@ -50,22 +50,49 @@ export default function Chatbox() {
     //     scrollToBottom();
     // }, [messages]);
     useEffect(() => {
-        if (token) {
-            try {
-                
+        if (token && userId) {
+            loadChatHistory();
+        }
+    }, [token, userId]);
+
+    const loadChatHistory = async () => {
+        try {
+            console.log('Loading chat history for user:', userId);
+            
+            // Try to load chat history from Python AI service
+            const pythonApiUrl = import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:5001';
+            const response = await axios.get(`${pythonApiUrl}/chat-history/${userId}`);
+            
+            if (response.data && response.data.messages && response.data.messages.length > 0) {
+                // Convert Python AI format to frontend format
+                const formattedMessages = response.data.messages.map(msg => ({
+                    sender: msg.role === 'user' ? 'user' : 'bot',
+                    text: msg.content
+                }));
+                setMessages(formattedMessages);
+                console.log('Loaded', formattedMessages.length, 'messages from history');
+            } else {
+                // No history found, show welcome message
                 const firstName = localStorage.getItem('first_name') || "";
-                const lastName = localStorage.getItem('last_name')|| "";
+                const lastName = localStorage.getItem('last_name') || "";
                 const welcomeMsg = {
                     sender: "bot",
                     text: `Hello ${firstName} ${lastName}! I'm Remmie, your travel booking assistant. I'm here to help you plan your perfect trip. How can I help you today, my friend?`
                 };
-
                 setMessages([welcomeMsg]);
-            } catch (err) {
-                console.error("JWT decode error:", err);
             }
+        } catch (error) {
+            console.error('Error loading chat history:', error);
+            // Fallback to welcome message
+            const firstName = localStorage.getItem('first_name') || "";
+            const lastName = localStorage.getItem('last_name') || "";
+            const welcomeMsg = {
+                sender: "bot",
+                text: `Hello ${firstName} ${lastName}! I'm Remmie, your travel booking assistant. I'm here to help you plan your perfect trip. How can I help you today, my friend?`
+            };
+            setMessages([welcomeMsg]);
         }
-    }, []);
+    };
 
     const sendMessage = async () => {
         if (!inputMessage.trim()) return;
@@ -75,13 +102,6 @@ export default function Chatbox() {
         setInputMessage('');
 
         try {
-            const payload = {
-                action: 'sendMessage',
-                sessionId: sessionId,
-                chatInput: inputMessage,
-                userId: userId // ✅ Send to bot
-            };
-
             // Step 1: Store USER message to backend
             await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/bookings-chat/store-message`, {
                 sessionId: sessionId,
@@ -90,28 +110,32 @@ export default function Chatbox() {
                 userId: userId
             });
 
-            // Step 2: Send message to N8N bot
-
-            //https://remmie.co:5678/webhook/4e01d18e-de75-4e0c-80b8-bf9aae6e08f6/chat
+            // Step 2: Send message to Python AI service
+            console.log('Sending message to Python AI:', inputMessage);
             
+            const pythonApiUrl = import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:5001';
             const res = await axios.post(
-                'https://remmie.co:5678/webhook/3176c1ff-171f-4881-9c93-923ad256f38a/chat',
-                payload,
+                `${pythonApiUrl}/chat`,
+                {
+                    message: inputMessage,
+                    recipient_id: userId
+                },
                 {
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Instance-Id': '2da9bf4f1ece7387f7a2c437b11f80fd9c2f46da08bd0e4f6f9aed86381a3f37'
-                    }
+                        'Content-Type': 'application/json'
+                    },
+                    timeout: 30000 // 30 second timeout
                 }
             );
 
             const botMsg = {
                 sender: 'bot',
-                text: res?.data?.output || '🤖 (no reply from bot)'
+                text: res?.data?.response || '🤖 Sorry, I had trouble processing your request.'
             };
 
             setMessages(prev => [...prev, botMsg]);
-              // Step 3: Store BOT reply to backend
+            
+            // Step 3: Store BOT reply to backend
             await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/bookings-chat/store-message`, {
                 sessionId: sessionId,
                 message: botMsg.text,
