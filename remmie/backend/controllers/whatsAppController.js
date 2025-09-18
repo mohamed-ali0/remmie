@@ -507,20 +507,20 @@ async function handleToLocation(phoneNumber, toLocation, fromCode, fromName, dep
 // Webhook Function
 async function wpWebhook(req, res) {
 
-    // const VERIFY_TOKEN = process.env.VERIFY_TOKEN || 'your_verify_token'; // fallback for dev
+    const VERIFY_TOKEN = process.env.VERIFY_TOKEN || 'your_verify_token'; // fallback for dev
 
     
-    // if (req.method === 'GET') {
-    //     const mode = req.query['hub.mode'];
-    //     const token = req.query['hub.verify_token'];
-    //     const challenge = req.query['hub.challenge'];
+    if (req.method === 'GET') {
+        const mode = req.query['hub.mode'];
+        const token = req.query['hub.verify_token'];
+        const challenge = req.query['hub.challenge'];
 
-    //     if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-    //         return res.status(200).send(challenge);
-    //     } else {
-    //         return res.sendStatus(403);
-    //     }
-    // }
+        if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+            return res.status(200).send(challenge);
+        } else {
+            return res.sendStatus(403);
+        }
+    }
 
     try {
         // Log input for debugging
