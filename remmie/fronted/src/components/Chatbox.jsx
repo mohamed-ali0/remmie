@@ -46,9 +46,9 @@ export default function Chatbox() {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
-    // useEffect(() => {
-    //     scrollToBottom();
-    // }, [messages]);
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
     useEffect(() => {
         if (token && userId) {
             loadChatHistory();
