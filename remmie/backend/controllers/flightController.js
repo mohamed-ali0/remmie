@@ -296,11 +296,10 @@ function createRoundTripPairs(departureOffers, returnOffers) {
         departure_offer_id: departureOffer.id,
         return_offer_id: returnOffer.id,
         
-        // Combined pricing
-        total_amount: combinedPrice.toFixed(2),
+        // Individual pricing (total calculated when both selected)
+        departure_price: departureOffer.total_amount,
+        return_price: returnOffer.total_amount,
         total_currency: departureOffer.total_currency || returnOffer.total_currency,
-        base_amount: (parseFloat(departureOffer.base_amount || 0) + parseFloat(returnOffer.base_amount || 0)).toFixed(2),
-        tax_amount: (parseFloat(departureOffer.tax_amount || 0) + parseFloat(returnOffer.tax_amount || 0)).toFixed(2),
         
         // Flight segments (both departure and return)
         slices: [
@@ -341,8 +340,12 @@ function createRoundTripPairs(departureOffers, returnOffers) {
     }
   }
   
-  // Sort by price (cheapest first)
-  return roundTripPairs.sort((a, b) => parseFloat(a.total_amount) - parseFloat(b.total_amount));
+  // Sort by combined price (cheapest first)
+  return roundTripPairs.sort((a, b) => {
+    const aTotalPrice = parseFloat(a.departure_price) + parseFloat(a.return_price);
+    const bTotalPrice = parseFloat(b.departure_price) + parseFloat(b.return_price);
+    return aTotalPrice - bTotalPrice;
+  });
 }
 
 // Filter function for Duffel flight offers
@@ -518,29 +521,117 @@ const offers = async (req, res) => {
 
 const fullOffers = async (req, res) => {
   const offerId = req.query.offer_id;
-  const baseUrl = `${duffel_api_url}/air/offers/${offerId}`;
-
-  try {
-    const response = await axios.get(baseUrl, {
-      headers: {
-        'Accept-Encoding': 'gzip',
-        'Accept': 'application/json',
-        'Duffel-Version': 'v2',
-        'Authorization': `Bearer ${duffel_access_tokens}`
+  
+  // Check if this is a round-trip combined offer ID
+  const isRoundTrip = offerId && offerId.startsWith('rt_');
+  
+  if (isRoundTrip) {
+    console.log('🔄 Fetching round-trip offer details for combined ID:', offerId);
+    
+    try {
+      // Extract departure and return offer IDs from combined ID
+      // Format: rt_departureOfferId_returnOfferId
+      const offerParts = offerId.replace('rt_', '').split('_');
+      if (offerParts.length < 2) {
+        return res.status(400).json({
+          error: 'Invalid round-trip offer ID format',
+          provided: offerId
+        });
       }
-    });
-
+      
+      const departureOfferId = offerParts[0];
+      const returnOfferId = offerParts.slice(1).join('_'); // Handle IDs with underscores
+      
+      console.log(`Fetching departure: ${departureOfferId}, return: ${returnOfferId}`);
+      
+      // Fetch both offers in parallel
+      const [departureResponse, returnResponse] = await Promise.all([
+        axios.get(`${duffel_api_url}/air/offers/${departureOfferId}`, {
+          headers: {
+            'Accept-Encoding': 'gzip',
+            'Accept': 'application/json',
+            'Duffel-Version': 'v2',
+            'Authorization': `Bearer ${duffel_access_tokens}`
+          }
+        }),
+        axios.get(`${duffel_api_url}/air/offers/${returnOfferId}`, {
+          headers: {
+            'Accept-Encoding': 'gzip',
+            'Accept': 'application/json',
+            'Duffel-Version': 'v2',
+            'Authorization': `Bearer ${duffel_access_tokens}`
+          }
+        })
+      ]);
+      
+      // Combine both offers into a unified response that looks like a single offer
+      const combinedOffer = {
+        data: {
+          id: offerId, // Use the combined ID
+          trip_type: 'round_trip',
+          total_amount: (
+            parseFloat(departureResponse.data.data.total_amount) + 
+            parseFloat(returnResponse.data.data.total_amount)
+          ).toFixed(2),
+          total_currency: departureResponse.data.data.total_currency,
+          base_amount: (
+            parseFloat(departureResponse.data.data.base_amount) + 
+            parseFloat(returnResponse.data.data.base_amount)
+          ).toFixed(2),
+          tax_amount: (
+            parseFloat(departureResponse.data.data.tax_amount) + 
+            parseFloat(returnResponse.data.data.tax_amount)
+          ).toFixed(2),
+          slices: [
+            ...departureResponse.data.data.slices,
+            ...returnResponse.data.data.slices
+          ],
+          passengers: departureResponse.data.data.passengers,
+          conditions: departureResponse.data.data.conditions,
+          expires_at: new Date(Math.min(
+            new Date(departureResponse.data.data.expires_at).getTime(),
+            new Date(returnResponse.data.data.expires_at).getTime()
+          )).toISOString(),
+          // Store original offers for reference
+          _departure_offer: departureResponse.data.data,
+          _return_offer: returnResponse.data.data
+        }
+      };
+      
+      res.status(200).json(combinedOffer);
+      
+    } catch (error) {
+      console.error('Round-trip offer fetch error:', error.message);
+      res.status(error.response?.status || 500).json({
+        error: 'Failed to fetch round-trip offer details',
+        detail: error.response?.data || error.message
+      });
+    }
     
-    res.status(200).json(response.data);
+  } else {
+    // One-way offer (original logic)
+    const baseUrl = `${duffel_api_url}/air/offers/${offerId}`;
 
-  } catch (error) {
-    
-    console.error('Duffel API Error:', error.response?.data || error.message);
-    res.status(error.response?.status || 500).json({
-      error: 'Duffel API failed',
-      url:baseUrl,
-      detail: error.response?.data || error.message
-    });
+    try {
+      const response = await axios.get(baseUrl, {
+        headers: {
+          'Accept-Encoding': 'gzip',
+          'Accept': 'application/json',
+          'Duffel-Version': 'v2',
+          'Authorization': `Bearer ${duffel_access_tokens}`
+        }
+      });
+
+      res.status(200).json(response.data);
+
+    } catch (error) {
+      console.error('Duffel API Error:', error.response?.data || error.message);
+      res.status(error.response?.status || 500).json({
+        error: 'Duffel API failed',
+        url: baseUrl,
+        detail: error.response?.data || error.message
+      });
+    }
   }
 };
 
@@ -799,13 +890,30 @@ const createConformOrder = async (req, res) => {
         trip_type: 'round_trip',
         departure_booking: departureResponse.data,
         return_booking: returnResponse.data,
-        combined_reference: `${departureResponse.data.data.booking_reference}_${returnResponse.data.data.booking_reference}`,
+        duffel_departure_reference: departureResponse.data.data.booking_reference,
+        duffel_return_reference: returnResponse.data.data.booking_reference,
         total_amount: (
           parseFloat(departureResponse.data.data.total_amount) + 
           parseFloat(returnResponse.data.data.total_amount)
         ).toFixed(2),
         currency: departureResponse.data.data.total_currency,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        // Create unified structure that looks like single booking
+        data: {
+          id: `RT_${departureResponse.data.data.id}_${returnResponse.data.data.id}`,
+          booking_reference: `${departureResponse.data.data.booking_reference}_${returnResponse.data.data.booking_reference}`,
+          total_amount: (
+            parseFloat(departureResponse.data.data.total_amount) + 
+            parseFloat(returnResponse.data.data.total_amount)
+          ).toFixed(2),
+          total_currency: departureResponse.data.data.total_currency,
+          slices: [
+            ...departureResponse.data.data.slices,
+            ...returnResponse.data.data.slices
+          ],
+          passengers: departureResponse.data.data.passengers,
+          conditions: departureResponse.data.data.conditions
+        }
       };
       
       // Update database with combined booking
@@ -823,21 +931,7 @@ const createConformOrder = async (req, res) => {
       ]);
       
       // Return unified response that looks like single booking to frontend
-      res.status(200).json({
-        data: {
-          id: combinedOrderJson.combined_reference,
-          booking_reference: combinedOrderJson.combined_reference,
-          total_amount: combinedOrderJson.total_amount,
-          total_currency: combinedOrderJson.currency,
-          slices: [
-            ...departureResponse.data.data.slices,
-            ...returnResponse.data.data.slices
-          ],
-          passengers: departureResponse.data.data.passengers,
-          conditions: departureResponse.data.data.conditions,
-          trip_type: 'round_trip'
-        }
-      });
+      res.status(200).json(combinedOrderJson);
       
     } else {
       // One-way booking (original logic)
