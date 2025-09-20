@@ -89,17 +89,18 @@ const offerRequestsMultidate = async (req, res) => {
     const passengers = userData.data.passengers;
     const cabin_class = userData.data.cabin_class;
 
-    // const duffel_api_url = 'https://api.duffel.com'; // Change if needed
-    // const duffel_access_tokens = 'duffel_test_mp7QOYCFrQGdCMiy25rww-SD1mbLebtdXdWUFDwur9Z';
-
     const getDateOffset = (dateStr, offset) => {
       const date = new Date(dateStr);
       date.setDate(date.getDate() + offset);
       return date.toISOString().split('T')[0];
     };
 
-    let searchCombinations = [];
+    let combinedOffers = [];
+    let firstPassengersData = [];
+
     if (slices.length === 1) {
+      // ONE-WAY: Search with date variations
+      let searchCombinations = [];
       [-1, 0, 1].forEach(offset => {
         const depDate = getDateOffset(slices[0].departure_date, offset);
         const today = new Date().toISOString().split('T')[0];
@@ -113,95 +114,144 @@ const offerRequestsMultidate = async (req, res) => {
         ]);
       });
 
-    } else if (slices.length === 2) {
-      [-1, 0, 1].forEach(offset => {
-        const depDate1 = getDateOffset(slices[0].departure_date, offset);
-        const depDate2 = getDateOffset(slices[1].departure_date, offset);
-        const today = new Date().toISOString().split('T')[0];
-        if (offset === -1 && (depDate1 < today || depDate2 < today)) return; // Skip if either is past
-        searchCombinations.push([
-          {
-            origin: slices[0].origin,
-            destination: slices[0].destination,
-            departure_date: depDate1
-          },
-          {
-            origin: slices[1].origin,
-            destination: slices[1].destination,
-            departure_date: depDate2
+      // Execute one-way searches
+      for (const combo of searchCombinations) {
+        const requestBody = {
+          data: {
+            slices: combo,
+            passengers: passengers,
+            cabin_class: cabin_class
           }
-        ]);
-      });
-    }
-    // if (slices.length === 1) {
-    //   // One-way trip: ±1 day loop
-    //   [-1, 0, 1].forEach(offset => {
-    //     searchCombinations.push([
-    //       {
-    //         origin: slices[0].origin,
-    //         destination: slices[0].destination,
-    //         departure_date: getDateOffset(slices[0].departure_date, offset)
-    //       }
-    //     ]);
-    //   });
+        };
 
-    // } else if (slices.length === 2) {
-    //   // Return trip: SAME offset for both slices (as per your rule)
-    //   [-1, 0, 1].forEach(offset => {
-    //     searchCombinations.push([
-    //       {
-    //         origin: slices[0].origin,
-    //         destination: slices[0].destination,
-    //         departure_date: getDateOffset(slices[0].departure_date, offset)
-    //       },
-    //       {
-    //         origin: slices[1].origin,
-    //         destination: slices[1].destination,
-    //         departure_date: getDateOffset(slices[1].departure_date, offset)
-    //       }
-    //     ]);
-    //   });
-    // }
+        const response = await axios.post(`${duffel_api_url}/air/offer_requests`, requestBody, {
+          headers: {
+            'Authorization': `Bearer ${duffel_access_tokens}`,
+            'Accept-Encoding': 'gzip',
+            'Accept': 'application/json',
+            'Duffel-Version': 'v2',
+            'Content-Type': 'application/json'
+          }
+        });
 
-    //let finalResults = [];
+        const filteredResponse = filterDuffelResponse(response.data);
 
-    let combinedOffers = [];
-    let firstPassengersData = [];
-
-    for (const combo of searchCombinations) {
-      const requestBody = {
-        data: {
-          slices: combo,
-          passengers: passengers,
-          cabin_class: cabin_class
+        if (firstPassengersData.length === 0) {
+          firstPassengersData = filteredResponse?.data?.passengers || [];
         }
-      };
 
-      const response = await axios.post(`${duffel_api_url}/air/offer_requests`, requestBody, {
-        headers: {
-          'Authorization': `Bearer ${duffel_access_tokens}`,
-          'Accept-Encoding': 'gzip',
-          'Accept': 'application/json',
-          'Duffel-Version': 'v2',
-          'Content-Type': 'application/json'
-        }
-      });
+        const offers = filteredResponse?.data?.offers || [];
+        combinedOffers = combinedOffers.concat(offers);
 
-      const filteredResponse = filterDuffelResponse(response.data);
-
-      // finalResults.push({
-      //   searched_slices: combo,
-      //   offers: response.data.data || []
-      // });
-      if (firstPassengersData.length === 0) {
-        firstPassengersData = filteredResponse?.data?.passengers || [];
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Optional delay
       }
 
-      const offers = filteredResponse?.data?.offers || [];
-      combinedOffers = combinedOffers.concat(offers);
+    } else if (slices.length === 2) {
+      // ROUND-TRIP: Handle as 2 separate one-way searches
+      console.log('🔄 Processing round-trip as 2 separate one-way flights');
+      
+      let departureOffers = [];
+      let returnOffers = [];
 
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Optional delay
+      // Search departure flights with date variations
+      for (let offset of [-1, 0, 1]) {
+        const depDate = getDateOffset(slices[0].departure_date, offset);
+        const today = new Date().toISOString().split('T')[0];
+        if (offset === -1 && depDate < today) continue; // Skip past dates
+
+        const departureRequest = {
+          data: {
+            slices: [{
+              origin: slices[0].origin,
+              destination: slices[0].destination,
+              departure_date: depDate
+            }],
+            passengers: passengers,
+            cabin_class: cabin_class
+          }
+        };
+
+        try {
+          const depResponse = await axios.post(`${duffel_api_url}/air/offer_requests`, departureRequest, {
+            headers: {
+              'Authorization': `Bearer ${duffel_access_tokens}`,
+              'Accept-Encoding': 'gzip',
+              'Accept': 'application/json',
+              'Duffel-Version': 'v2',
+              'Content-Type': 'application/json'
+            }
+          });
+
+          const filteredDepResponse = filterDuffelResponse(depResponse.data);
+          if (firstPassengersData.length === 0) {
+            firstPassengersData = filteredDepResponse?.data?.passengers || [];
+          }
+
+          const depOffers = filteredDepResponse?.data?.offers || [];
+          departureOffers = departureOffers.concat(depOffers.map(offer => ({
+            ...offer,
+            flight_type: 'departure',
+            search_date: depDate,
+            original_date: slices[0].departure_date
+          })));
+
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (error) {
+          console.error(`Error searching departure flights for ${depDate}:`, error.message);
+        }
+      }
+
+      // Search return flights with date variations  
+      for (let offset of [-1, 0, 1]) {
+        const retDate = getDateOffset(slices[1].departure_date, offset);
+        const today = new Date().toISOString().split('T')[0];
+        if (offset === -1 && retDate < today) continue; // Skip past dates
+
+        const returnRequest = {
+          data: {
+            slices: [{
+              origin: slices[1].origin,
+              destination: slices[1].destination,
+              departure_date: retDate
+            }],
+            passengers: passengers,
+            cabin_class: cabin_class
+          }
+        };
+
+        try {
+          const retResponse = await axios.post(`${duffel_api_url}/air/offer_requests`, returnRequest, {
+            headers: {
+              'Authorization': `Bearer ${duffel_access_tokens}`,
+              'Accept-Encoding': 'gzip',
+              'Accept': 'application/json',
+              'Duffel-Version': 'v2',
+              'Content-Type': 'application/json'
+            }
+          });
+
+          const filteredRetResponse = filterDuffelResponse(retResponse.data);
+          const retOffers = filteredRetResponse?.data?.offers || [];
+          returnOffers = returnOffers.concat(retOffers.map(offer => ({
+            ...offer,
+            flight_type: 'return',
+            search_date: retDate,
+            original_date: slices[1].departure_date
+          })));
+
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (error) {
+          console.error(`Error searching return flights for ${retDate}:`, error.message);
+        }
+      }
+
+      // Combine departure and return offers into round-trip pairs
+      console.log(`Found ${departureOffers.length} departure offers and ${returnOffers.length} return offers`);
+      
+      combinedOffers = createRoundTripPairs(departureOffers, returnOffers);
+      console.log(`Created ${combinedOffers.length} round-trip combinations`);
     }
+    // Return response for both one-way and round-trip
 
     res.status(200).json({
       success: true,
@@ -221,6 +271,79 @@ const offerRequestsMultidate = async (req, res) => {
     }
   }
 };
+
+// Function to combine departure and return offers into round-trip pairs
+function createRoundTripPairs(departureOffers, returnOffers) {
+  const roundTripPairs = [];
+  
+  // Limit to reasonable number of combinations (max 5 pairs)
+  const maxDepartures = Math.min(departureOffers.length, 5);
+  const maxReturns = Math.min(returnOffers.length, 5);
+  
+  for (let i = 0; i < maxDepartures; i++) {
+    for (let j = 0; j < maxReturns; j++) {
+      const departureOffer = departureOffers[i];
+      const returnOffer = returnOffers[j];
+      
+      // Calculate combined price
+      const departurePrice = parseFloat(departureOffer.total_amount) || 0;
+      const returnPrice = parseFloat(returnOffer.total_amount) || 0;
+      const combinedPrice = departurePrice + returnPrice;
+      
+      // Create combined round-trip offer
+      const roundTripOffer = {
+        id: `rt_${departureOffer.id}_${returnOffer.id}`, // Combined ID
+        departure_offer_id: departureOffer.id,
+        return_offer_id: returnOffer.id,
+        
+        // Combined pricing
+        total_amount: combinedPrice.toFixed(2),
+        total_currency: departureOffer.total_currency || returnOffer.total_currency,
+        base_amount: (parseFloat(departureOffer.base_amount || 0) + parseFloat(returnOffer.base_amount || 0)).toFixed(2),
+        tax_amount: (parseFloat(departureOffer.tax_amount || 0) + parseFloat(returnOffer.tax_amount || 0)).toFixed(2),
+        
+        // Flight segments (both departure and return)
+        slices: [
+          ...(departureOffer.slices || []).map(slice => ({
+            ...slice,
+            flight_type: 'departure',
+            original_offer_id: departureOffer.id
+          })),
+          ...(returnOffer.slices || []).map(slice => ({
+            ...slice,
+            flight_type: 'return',
+            original_offer_id: returnOffer.id
+          }))
+        ],
+        
+        // Passenger information (from departure offer)
+        passengers: departureOffer.passengers,
+        
+        // Metadata
+        trip_type: 'round_trip',
+        created_at: new Date().toISOString(),
+        
+        // Original offers for reference
+        _departure_offer: departureOffer,
+        _return_offer: returnOffer
+      };
+      
+      roundTripPairs.push(roundTripOffer);
+      
+      // Limit total combinations to prevent too many options
+      if (roundTripPairs.length >= 15) {
+        break;
+      }
+    }
+    
+    if (roundTripPairs.length >= 15) {
+      break;
+    }
+  }
+  
+  // Sort by price (cheapest first)
+  return roundTripPairs.sort((a, b) => parseFloat(a.total_amount) - parseFloat(b.total_amount));
+}
 
 // Filter function for Duffel flight offers
 function filterDuffelResponse(data) {
@@ -608,45 +731,155 @@ const saveOrderAmount = async (req, res) => {
 
 const createConformOrder = async (req, res) => {
   try {
-
     const requestData = req.body;
     const id = requestData.id;
     const data = requestData.data;
-    const response = await axios.post(
-      `${duffel_api_url}/air/orders`,
-      {data},
-      {
-        headers: {
-          'Authorization': `Bearer ${duffel_access_tokens}`,
-          'Accept-Encoding': 'gzip',
-          'Accept': 'application/json',
-          'Duffel-Version': 'v2',
-          'Content-Type': 'application/json'
-        }
+    
+    // Check if this is a round-trip booking (has combined offer ID)
+    const selectedOfferId = data.selected_offers[0];
+    const isRoundTrip = selectedOfferId && selectedOfferId.startsWith('rt_');
+    
+    if (isRoundTrip) {
+      console.log('🔄 Processing round-trip as 2 separate Duffel bookings');
+      
+      // Extract departure and return offer IDs from combined ID
+      // Format: rt_departureOfferId_returnOfferId
+      const offerParts = selectedOfferId.replace('rt_', '').split('_');
+      if (offerParts.length < 2) {
+        throw new Error('Invalid round-trip offer ID format');
       }
-    );
+      
+      const departureOfferId = offerParts[0];
+      const returnOfferId = offerParts.slice(1).join('_'); // Handle IDs with underscores
+      
+      console.log(`Booking departure: ${departureOfferId}, return: ${returnOfferId}`);
+      
+      // Create departure booking
+      const departureData = {
+        ...data,
+        selected_offers: [departureOfferId]
+      };
+      
+      const departureResponse = await axios.post(
+        `${duffel_api_url}/air/orders`,
+        { data: departureData },
+        {
+          headers: {
+            'Authorization': `Bearer ${duffel_access_tokens}`,
+            'Accept-Encoding': 'gzip',
+            'Accept': 'application/json',
+            'Duffel-Version': 'v2',
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      // Create return booking  
+      const returnData = {
+        ...data,
+        selected_offers: [returnOfferId]
+      };
+      
+      const returnResponse = await axios.post(
+        `${duffel_api_url}/air/orders`,
+        { data: returnData },
+        {
+          headers: {
+            'Authorization': `Bearer ${duffel_access_tokens}`,
+            'Accept-Encoding': 'gzip',
+            'Accept': 'application/json',
+            'Duffel-Version': 'v2',
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      // Combine both bookings into unified response
+      const combinedOrderJson = {
+        trip_type: 'round_trip',
+        departure_booking: departureResponse.data,
+        return_booking: returnResponse.data,
+        combined_reference: `${departureResponse.data.data.booking_reference}_${returnResponse.data.data.booking_reference}`,
+        total_amount: (
+          parseFloat(departureResponse.data.data.total_amount) + 
+          parseFloat(returnResponse.data.data.total_amount)
+        ).toFixed(2),
+        currency: departureResponse.data.data.total_currency,
+        created_at: new Date().toISOString()
+      };
+      
+      // Update database with combined booking
+      const query = `
+        UPDATE ${dbPrefix}bookings
+        SET 
+            conform_order_json = ?,
+            updated_at = NOW()
+        WHERE id = ?
+      `;
+      
+      await pool.query(query, [
+        JSON.stringify(combinedOrderJson),
+        id
+      ]);
+      
+      // Return unified response that looks like single booking to frontend
+      res.status(200).json({
+        data: {
+          id: combinedOrderJson.combined_reference,
+          booking_reference: combinedOrderJson.combined_reference,
+          total_amount: combinedOrderJson.total_amount,
+          total_currency: combinedOrderJson.currency,
+          slices: [
+            ...departureResponse.data.data.slices,
+            ...returnResponse.data.data.slices
+          ],
+          passengers: departureResponse.data.data.passengers,
+          conditions: departureResponse.data.data.conditions,
+          trip_type: 'round_trip'
+        }
+      });
+      
+    } else {
+      // One-way booking (original logic)
+      console.log('✈️ Processing one-way booking');
+      
+      const response = await axios.post(
+        `${duffel_api_url}/air/orders`,
+        {data},
+        {
+          headers: {
+            'Authorization': `Bearer ${duffel_access_tokens}`,
+            'Accept-Encoding': 'gzip',
+            'Accept': 'application/json',
+            'Duffel-Version': 'v2',
+            'Content-Type': 'application/json'
+          }
+        }
+      );
 
-    // ✅ Save this Duffel response
-    const conformOrderJson = response.data;
+      // ✅ Save this Duffel response
+      const conformOrderJson = response.data;
 
-    // 🛠️ Update database
-    const query = `
-      UPDATE ${dbPrefix}bookings
-      SET 
-          conform_order_json = ?,
-          updated_at = NOW()
-      WHERE id = ?
-    `;
+      // 🛠️ Update database
+      const query = `
+        UPDATE ${dbPrefix}bookings
+        SET 
+            conform_order_json = ?,
+            updated_at = NOW()
+        WHERE id = ?
+      `;
 
-    const [result] = await pool.query(query, [
-      JSON.stringify(conformOrderJson),
-      id
-    ]);
+      await pool.query(query, [
+        JSON.stringify(conformOrderJson),
+        id
+      ]);
 
-    // Return Duffel's success response
-    res.status(response.status).json(conformOrderJson);
+      // Return Duffel's success response
+      res.status(response.status).json(conformOrderJson);
+    }
 
   } catch (error) {
+    console.error('Create conform order error:', error.message);
     // Return Duffel error as-is
     if (error.response) {
       res.status(error.response.status).json(error.response.data);
