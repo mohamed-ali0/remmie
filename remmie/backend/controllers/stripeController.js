@@ -40,6 +40,12 @@ async function createFlightPaymentSession(req, res) {
     }
 
     const unitAmount = Math.round(booking.amount * 100);
+    
+    console.log(`💳 Creating flight payment session:`);
+    console.log(`   Booking ref: ${booking_ref}`);
+    console.log(`   Database amount: ${booking.amount}`);
+    console.log(`   Currency: ${booking.currency}`);
+    console.log(`   Stripe unit amount: ${unitAmount} (amount * 100)`);
 
     // 2. Get Stripe customer ID
     const [[user]] = await pool.query(

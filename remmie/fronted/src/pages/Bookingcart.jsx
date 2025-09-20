@@ -145,6 +145,14 @@ const BookingCart = () => {
                             setIsOfferExpired(expiryTime < Date.now());
                         }
                         
+                        console.log('🔍 Frontend: Processing offer data:');
+                        console.log('   Offer ID:', offerId);
+                        console.log('   Trip type:', offerData?.data?.trip_type);
+                        console.log('   Base amount:', offerData?.data.base_amount);
+                        console.log('   Tax amount:', offerData?.data.tax_amount);
+                        console.log('   Total amount:', offerData?.data.total_amount);
+                        console.log('   Currency:', offerData?.data.total_currency);
+                        
                         // Send to backend
                        await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/flight/save-order-amount`, {
                           data: {

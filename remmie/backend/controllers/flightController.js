@@ -564,15 +564,22 @@ const fullOffers = async (req, res) => {
         })
       ]);
       
+      // Calculate combined totals
+      const departureTotal = parseFloat(departureResponse.data.data.total_amount);
+      const returnTotal = parseFloat(returnResponse.data.data.total_amount);
+      const combinedTotal = (departureTotal + returnTotal).toFixed(2);
+      
+      console.log(`🔢 Round-trip pricing calculation:`);
+      console.log(`   Departure total: ${departureTotal}`);
+      console.log(`   Return total: ${returnTotal}`);
+      console.log(`   Combined total: ${combinedTotal}`);
+      
       // Combine both offers into a unified response that looks like a single offer
       const combinedOffer = {
         data: {
           id: offerId, // Use the combined ID
           trip_type: 'round_trip',
-          total_amount: (
-            parseFloat(departureResponse.data.data.total_amount) + 
-            parseFloat(returnResponse.data.data.total_amount)
-          ).toFixed(2),
+          total_amount: combinedTotal,
           total_currency: departureResponse.data.data.total_currency,
           base_amount: (
             parseFloat(departureResponse.data.data.base_amount) + 
@@ -733,6 +740,11 @@ const saveOrderAmount = async (req, res) => {
             WHERE id = ?
         `;
 
+        console.log(`💰 Saving booking amount:`);
+        console.log(`   Booking ID: ${requestData.booking_id}`);
+        console.log(`   Total amount: ${requestData.total_amount}`);
+        console.log(`   Currency: ${requestData.currency}`);
+        
         // 🔄 4. Execute query with parameters
         const [result] = await pool.query(query, [
             JSON.stringify(requestData.flight_offers),
@@ -747,6 +759,7 @@ const saveOrderAmount = async (req, res) => {
         }
 
         // ✅ 6. Success response
+        console.log(`✅ Database updated successfully for booking ID: ${requestData.booking_id}`);
         res.json({ success: true, message: 'Offer updated successfully' });
 
     } catch (err) {
