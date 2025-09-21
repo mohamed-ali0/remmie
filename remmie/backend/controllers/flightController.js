@@ -686,9 +686,98 @@ const offers = async (req, res) => {
 
 const fullOffers = async (req, res) => {
   const offerId = req.query.offer_id;
+  const bookingRef = req.query.booking_ref;
   
   // Check if this is a round-trip combined offer ID
   const isRoundTrip = offerId && offerId.startsWith('rt_');
+  
+  // If no offer_id but booking_ref provided, check for round-trip session
+  if (!offerId && bookingRef) {
+    console.log('🔍 Checking booking reference for round-trip session:', bookingRef);
+    
+    try {
+      // Check if this booking is part of a round-trip session
+      const [bookingInfo] = await pool.query(
+        `SELECT round_trip_session_id, round_trip_type FROM ${dbPrefix}bookings 
+         WHERE booking_reference = ? AND round_trip_session_id IS NOT NULL LIMIT 1`,
+        [bookingRef]
+      );
+      
+      if (bookingInfo.length > 0) {
+        console.log('🔄 Found round-trip session booking:', bookingInfo[0]);
+        
+        // Get both bookings in the session
+        const [sessionBookings] = await pool.query(
+          `SELECT booking_reference, booking_json, round_trip_type FROM ${dbPrefix}bookings 
+           WHERE round_trip_session_id = ? ORDER BY created_at ASC`,
+          [bookingInfo[0].round_trip_session_id]
+        );
+        
+        if (sessionBookings.length === 2) {
+          const departureBooking = sessionBookings.find(b => b.round_trip_type === 'departure');
+          const returnBooking = sessionBookings.find(b => b.round_trip_type === 'return');
+          
+          const departureData = JSON.parse(departureBooking.booking_json);
+          const returnData = JSON.parse(returnBooking.booking_json);
+          
+          const departureOfferId = departureData.data.selected_offers[0];
+          const returnOfferId = returnData.data.selected_offers[0];
+          
+          console.log(`🔄 Processing round-trip session: departure=${departureOfferId}, return=${returnOfferId}`);
+          
+          // Fetch both offers from Duffel API
+          const [departureResponse, returnResponse] = await Promise.all([
+            axios.get(`${duffel_api_url}/air/offers/${departureOfferId}`, {
+              headers: {
+                'Accept-Encoding': 'gzip',
+                'Accept': 'application/json',
+                'Duffel-Version': 'v2',
+                'Authorization': `Bearer ${duffel_access_tokens}`
+              }
+            }),
+            axios.get(`${duffel_api_url}/air/offers/${returnOfferId}`, {
+              headers: {
+                'Accept-Encoding': 'gzip',
+                'Accept': 'application/json',
+                'Duffel-Version': 'v2',
+                'Authorization': `Bearer ${duffel_access_tokens}`
+              }
+            })
+          ]);
+          
+          const departureTotal = parseFloat(departureResponse.data.data.total_amount);
+          const returnTotal = parseFloat(returnResponse.data.data.total_amount);
+          const combinedTotal = (departureTotal + returnTotal).toFixed(2);
+          
+          console.log(`🔢 Round-trip session pricing:`);
+          console.log(`   Departure: ${departureTotal}`);
+          console.log(`   Return: ${returnTotal}`);
+          console.log(`   Combined: ${combinedTotal}`);
+          
+          const combinedOffer = {
+            data: {
+              id: `rt_session_${bookingInfo[0].round_trip_session_id}`,
+              trip_type: 'round_trip_session',
+              total_amount: combinedTotal,
+              total_currency: departureResponse.data.data.total_currency,
+              base_amount: (parseFloat(departureResponse.data.data.base_amount) + parseFloat(returnResponse.data.data.base_amount)).toFixed(2),
+              tax_amount: (parseFloat(departureResponse.data.data.tax_amount) + parseFloat(returnResponse.data.data.tax_amount)).toFixed(2),
+              slices: [...departureResponse.data.data.slices, ...returnResponse.data.data.slices],
+              passengers: departureResponse.data.data.passengers,
+              conditions: departureResponse.data.data.conditions,
+              expires_at: new Date(Math.min(new Date(departureResponse.data.data.expires_at).getTime(), new Date(returnResponse.data.data.expires_at).getTime())),
+              round_trip_session_id: bookingInfo[0].round_trip_session_id
+            }
+          };
+          
+          return res.status(200).json(combinedOffer);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking round-trip session:', error.message);
+      // Continue to regular offer processing
+    }
+  }
   
   if (isRoundTrip) {
     console.log('🔄 Fetching round-trip offer details for combined ID:', offerId);
@@ -842,10 +931,16 @@ const createOrderLink = async (req, res) => {
     
     const selectedOfferId = requestData.data.selected_offers[0];
     const isRoundTrip = selectedOfferId && selectedOfferId.startsWith('rt_');
+    const roundTripSessionId = requestData.data.round_trip_session_id;
+    const roundTripType = requestData.data.round_trip_type;
+    const isRoundTripBooking = roundTripSessionId && roundTripType;
     
     console.log(`📝 Creating booking order link:`);
     console.log(`   Selected offer ID: ${selectedOfferId}`);
     console.log(`   Is round-trip: ${isRoundTrip}`);
+    console.log(`   Round-trip session ID: ${roundTripSessionId}`);
+    console.log(`   Round-trip type: ${roundTripType}`);
+    console.log(`   Is round-trip booking: ${isRoundTripBooking}`);
     console.log(`   Passengers: ${requestData.data.passengers.length}`);
     console.log(`   Request data:`, JSON.stringify(requestData, null, 2));
     
@@ -863,20 +958,75 @@ const createOrderLink = async (req, res) => {
         isUnique = existing.length === 0;
       }
 
-      // Save booking
-      const [result] = await pool.query(
-        `INSERT INTO ${dbPrefix}bookings (booking_reference,booking_json,created_at)
-         VALUES (?,?,NOW())`,
-        [bookingRef,JSON.stringify(requestData)]
-      );
-
-      return res.status(201).json({
-        success: true,
-        message: 'Booking saved successfully',
-        booking_reference: bookingRef,
-        booking_id: result.insertId,
-        booking_url: `${booking_base_url}?booking_ref=${bookingRef}`
-      });
+      // Save booking with round-trip session info if applicable
+      let insertQuery, insertValues;
+      
+      if (isRoundTripBooking) {
+        insertQuery = `INSERT INTO ${dbPrefix}bookings (booking_reference, booking_json, round_trip_session_id, round_trip_type, created_at)
+                       VALUES (?, ?, ?, ?, NOW())`;
+        insertValues = [bookingRef, JSON.stringify(requestData), roundTripSessionId, roundTripType];
+        
+        console.log(`🔗 Saving round-trip booking part:`);
+        console.log(`   Session ID: ${roundTripSessionId}`);
+        console.log(`   Type: ${roundTripType}`);
+      } else {
+        insertQuery = `INSERT INTO ${dbPrefix}bookings (booking_reference, booking_json, created_at)
+                       VALUES (?, ?, NOW())`;
+        insertValues = [bookingRef, JSON.stringify(requestData)];
+      }
+      
+      const [result] = await pool.query(insertQuery, insertValues);
+      
+      // For round-trip bookings, check if this completes the pair
+      if (isRoundTripBooking) {
+        const [sessionBookings] = await pool.query(
+          `SELECT booking_reference, round_trip_type FROM ${dbPrefix}bookings 
+           WHERE round_trip_session_id = ? ORDER BY created_at ASC`,
+          [roundTripSessionId]
+        );
+        
+        console.log(`🔍 Round-trip session bookings found: ${sessionBookings.length}`);
+        
+        if (sessionBookings.length === 2) {
+          // Both departure and return bookings are complete
+          const departureBooking = sessionBookings.find(b => b.round_trip_type === 'departure');
+          const returnBooking = sessionBookings.find(b => b.round_trip_type === 'return');
+          
+          console.log(`✅ Round-trip complete! Departure: ${departureBooking.booking_reference}, Return: ${returnBooking.booking_reference}`);
+          
+          // Return the departure booking reference for checkout (it will handle both)
+          return res.status(201).json({
+            success: true,
+            message: 'Round-trip booking completed successfully',
+            booking_reference: departureBooking.booking_reference,
+            booking_id: result.insertId,
+            booking_url: `${booking_base_url}?booking_ref=${departureBooking.booking_reference}`,
+            round_trip_session_id: roundTripSessionId,
+            is_round_trip_complete: true
+          });
+        } else {
+          // Only one part of round-trip is complete
+          console.log(`⏳ Round-trip partial (${roundTripType} completed)`);
+          
+          return res.status(201).json({
+            success: true,
+            message: `Round-trip ${roundTripType} booking saved, waiting for ${roundTripType === 'departure' ? 'return' : 'departure'}`,
+            booking_reference: bookingRef,
+            booking_id: result.insertId,
+            round_trip_session_id: roundTripSessionId,
+            is_round_trip_complete: false
+          });
+        }
+      } else {
+        // Regular one-way booking
+        return res.status(201).json({
+          success: true,
+          message: 'Booking saved successfully',
+          booking_reference: bookingRef,
+          booking_id: result.insertId,
+          booking_url: `${booking_base_url}?booking_ref=${bookingRef}`
+        });
+      }
   } catch (err) {
     console.error('Error saving booking:', err);
     return res.status(500).json({ message: 'Server error',error:err });

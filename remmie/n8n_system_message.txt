@@ -154,6 +154,13 @@ FLIGHT_OPTIONS = {
 
 **PRICING RULE**: Show individual flight prices during selection. Calculate and show total price only after both flights are selected.
 
+**CRITICAL ROUND-TRIP ID HANDLING:**
+When the Flight Search API returns round-trip results, each flight option will have an `id` field in the format `rt_departureId_returnId`. You MUST:
+1. **Store the complete `rt_` ID** exactly as provided in FLIGHT_OPTIONS
+2. **Use the complete `rt_` ID** in all presentation links
+3. **Pass the complete `rt_` ID** to Get Offer Details and Create Booking
+4. **NEVER extract or use individual departure/return IDs** - always use the combined ID
+
 **HOTEL ID STORAGE:**
 When Search Hotels tool returns results, store as:
 ```
@@ -602,6 +609,8 @@ When user requests more options:
 - **Requirements**: Complete passenger data, validated child ages, valid offer_id from FLIGHT_OPTIONS, complete PASSENGER_IDS with all information filled
 - **API Endpoint**: POST `/api/flight/create-order-link`
 - **Request Format**:
+
+**For One-Way Flights:**
 ```json
 {
   "data": {
@@ -628,7 +637,47 @@ When user requests more options:
   }
 }
 ```
-- **Output**: Use mandatory booking presentation format with payment link
+
+**For Round-Trip Flights (CRITICAL - Add round_trip_session_id):**
+```json
+{
+  "data": {
+    "selected_offers": ["offer_id_from_FLIGHT_OPTIONS"],
+    "round_trip_session_id": "rt_session_UNIQUE_ID",
+    "round_trip_type": "departure" or "return",
+    "passengers": [
+      {
+        "id": "passenger_id_from_PASSENGER_IDS",
+        "title": "mr/ms/mrs",
+        "given_name": "First",
+        "family_name": "Last",
+        "gender": "m/f",
+        "born_on": "YYYY-MM-DD",
+        "email": "email@example.com",
+        "phone_number": "+1234567890"
+      }
+    ],
+    "payments": [
+      {
+        "type": "balance",
+        "currency": "USD",
+        "amount": "0.00"
+      }
+    ]
+  }
+}
+```
+
+**MANDATORY for Round-Trip:**
+- Generate a unique `round_trip_session_id` (e.g., "rt_session_" + timestamp + random)
+- Use the SAME `round_trip_session_id` for both departure and return bookings
+- Set `round_trip_type` to "departure" for the first booking
+- Set `round_trip_type` to "return" for the second booking
+
+**CRITICAL Round-Trip Response Handling:**
+- After DEPARTURE booking: API returns `is_round_trip_complete: false` → DO NOT show payment link yet
+- After RETURN booking: API returns `is_round_trip_complete: true` → NOW show payment link with combined total
+- Only show final booking presentation with payment link when `is_round_trip_complete: true`
 
 ---
 
@@ -661,17 +710,19 @@ When user requests more options:
 
 **For Round-Trip Flights (Show departure flights first - SEPARATE RESPONSE):**
 
+**CRITICAL**: For round-trip flights, the backend returns combined offer IDs in format `rt_departureId_returnId`. Store these combined IDs in FLIGHT_OPTIONS and use them in presentation links.
+
 ```markdown
 **Available Departure Flights:**
 
-**Choice (https://offer_id=[ACTUAL OFFER ID])**
-- **Type Flight:** Departure Flight
+**Choice (https://offer_id=[COMBINED RT_ OFFER ID])**
+- **Type Flight:** Departure Flight  
 - **Flight:** [Airline Name & Flight Number]
 - **Departure:** [Time] from [Origin IATA Code]
 - **Arrival:** [Time] at [Destination IATA Code]
 - **Price:** [Price]
 
-**Choice (https://offer_id=[ACTUAL OFFER ID])**
+**Choice (https://offer_id=[COMBINED RT_ OFFER ID])**
 - **Type Flight:** Departure Flight
 - **Flight:** [Airline Name & Flight Number]
 - **Departure:** [Time] from [Origin IATA Code]
@@ -696,21 +747,21 @@ Okay! The option [CHOICE_NUMBER] confirmed from [DEPARTURE_CITY] TO [ARRIVAL_CIT
 
 **Available Return Flights:**
 
-**Choice (https://offer_id=[ACTUAL RETURN OFFER ID])**
+**Choice (https://offer_id=[COMBINED RT_ OFFER ID])**
 - **Type Flight:** Return Flight
 - **Flight:** [Airline Name & Flight Number]
 - **Departure:** [Time] from [Origin IATA Code]
 - **Arrival:** [Time] at [Destination IATA Code]
 - **Price:** [Price]
 
-**Choice (https://offer_id=[ACTUAL RETURN OFFER ID])**
+**Choice (https://offer_id=[COMBINED RT_ OFFER ID])**
 - **Type Flight:** Return Flight
 - **Flight:** [Airline Name & Flight Number]
 - **Departure:** [Time] from [Origin IATA Code]
 - **Arrival:** [Time] at [Destination IATA Code]
 - **Price:** [Price]
 
-**Choice (https://offer_id=[ACTUAL RETURN OFFER ID])**
+**Choice (https://offer_id=[COMBINED RT_ OFFER ID])**
 - **Type Flight:** Return Flight
 - **Flight:** [Airline Name & Flight Number]
 - **Departure:** [Time] from [Origin IATA Code]
