@@ -168,19 +168,21 @@ uniqueFlights.forEach((flight, index) => {
     departure_airport: firstSegment?.origin?.iata_code || "",
     arrival_airport: firstSegment?.destination?.iata_code || "",
     trip_type: flight.slices?.length === 1 ? "one_way" : "round_trip",
-    // For round-trip, store additional details if available
-    departure_details: flight.slices?.length > 1 ? {
-      airline: flight.owner?.name || "Unknown",
-      flight_number: firstSegment?.marketing_carrier_flight_number || "",
-      departure_time: firstSegment?.departure?.at || "",
-      price: flight.departure_price || flight.total_amount || "0"
-    } : null,
-    return_details: flight.slices?.length > 1 ? {
-      airline: flight.owner?.name || "Unknown", 
-      flight_number: flight.slices[1]?.segments?.[0]?.marketing_carrier_flight_number || "",
-      departure_time: flight.slices[1]?.segments?.[0]?.departure?.at || "",
-      price: flight.return_price || "0"
-    } : null
+        // For round-trip, extract detailed flight information
+        departure_details: flight.trip_type === 'round_trip' && flight.departure_details ? {
+          airline: flight.departure_details.airline || "Unknown",
+          flight_number: flight.departure_details.flight_number || "",
+          departure_time: flight.departure_details.departure_time || "",
+          arrival_time: flight.departure_details.arrival_time || "",
+          price: flight.departure_details.price || flight.departure_price || "0"
+        } : null,
+        return_details: flight.trip_type === 'round_trip' && flight.return_details ? {
+          airline: flight.return_details.airline || "Unknown", 
+          flight_number: flight.return_details.flight_number || "",
+          departure_time: flight.return_details.departure_time || "",
+          arrival_time: flight.return_details.arrival_time || "",
+          price: flight.return_details.price || flight.return_price || "0"
+        } : null
   };
 });
 console.log("✅ Created FLIGHT_OPTIONS structure:", JSON.stringify(FLIGHT_OPTIONS, null, 2));

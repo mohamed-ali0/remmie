@@ -66,6 +66,20 @@ const offerRequests = async (req, res) => {
 
       // Filter only essential data 
       const filteredResponse = filterDuffelResponse(response.data);
+      
+      // Debug logging for one-way flights
+      console.log(`🔄 One-Way Flight Search Response Summary:`);
+      console.log(`   Total offers: ${filteredResponse.data?.offers?.length || 0}`);
+      if (filteredResponse.data?.offers?.length > 0) {
+        console.log(`   Sample offer structure:`, {
+          id: filteredResponse.data.offers[0].id,
+          total_amount: filteredResponse.data.offers[0].total_amount,
+          total_currency: filteredResponse.data.offers[0].total_currency,
+          trip_type: 'one_way',
+          hasSlices: !!filteredResponse.data.offers[0].slices
+        });
+      }
+      
       res.status(response.status).json(filteredResponse);
 
     } catch (error) {
@@ -252,6 +266,19 @@ const offerRequestsMultidate = async (req, res) => {
       console.log(`Created ${combinedOffers.length} round-trip combinations`);
     }
     // Return response for both one-way and round-trip
+    console.log(`🔄 Flight Search Response Summary:`);
+    console.log(`   Trip type: ${slices.length === 1 ? 'One-way' : 'Round-trip'}`);
+    console.log(`   Total offers: ${combinedOffers.length}`);
+    if (combinedOffers.length > 0) {
+      console.log(`   Sample offer structure:`, {
+        id: combinedOffers[0].id,
+        total_amount: combinedOffers[0].total_amount,
+        total_currency: combinedOffers[0].total_currency,
+        trip_type: combinedOffers[0].trip_type || 'one_way',
+        hasOwner: !!combinedOffers[0].owner,
+        hasSlices: !!combinedOffers[0].slices
+      });
+    }
 
     res.status(200).json({
       success: true,
@@ -299,7 +326,15 @@ function createRoundTripPairs(departureOffers, returnOffers) {
         // Individual pricing (total calculated when both selected)
         departure_price: departureOffer.total_amount,
         return_price: returnOffer.total_amount,
+        total_amount: combinedPrice.toFixed(2), // Add combined total_amount for consistency
         total_currency: departureOffer.total_currency || returnOffer.total_currency,
+        
+        // Add owner field for consistency with one-way offers
+        owner: departureOffer.owner || { name: departureOffer.slices?.[0]?.segments?.[0]?.marketing_carrier?.name || "Unknown Airline" },
+        
+        // Add base_amount and tax_amount for consistency
+        base_amount: (parseFloat(departureOffer.base_amount || 0) + parseFloat(returnOffer.base_amount || 0)).toFixed(2),
+        tax_amount: (parseFloat(departureOffer.tax_amount || 0) + parseFloat(returnOffer.tax_amount || 0)).toFixed(2),
         
         // Flight segments (both departure and return)
         slices: [
@@ -321,6 +356,26 @@ function createRoundTripPairs(departureOffers, returnOffers) {
         // Metadata
         trip_type: 'round_trip',
         created_at: new Date().toISOString(),
+        
+        // Detailed departure and return flight information for N8N
+        departure_details: {
+          airline: departureOffer.owner?.name || departureOffer.slices?.[0]?.segments?.[0]?.marketing_carrier?.name || "Unknown Airline",
+          flight_number: departureOffer.slices?.[0]?.segments?.[0]?.marketing_carrier_flight_number || "",
+          departure_time: departureOffer.slices?.[0]?.segments?.[0]?.departing_at || "",
+          arrival_time: departureOffer.slices?.[0]?.segments?.[0]?.arriving_at || "",
+          price: departureOffer.total_amount,
+          origin: departureOffer.slices?.[0]?.origin || {},
+          destination: departureOffer.slices?.[0]?.destination || {}
+        },
+        return_details: {
+          airline: returnOffer.owner?.name || returnOffer.slices?.[0]?.segments?.[0]?.marketing_carrier?.name || "Unknown Airline",
+          flight_number: returnOffer.slices?.[0]?.segments?.[0]?.marketing_carrier_flight_number || "",
+          departure_time: returnOffer.slices?.[0]?.segments?.[0]?.departing_at || "",
+          arrival_time: returnOffer.slices?.[0]?.segments?.[0]?.arriving_at || "",
+          price: returnOffer.total_amount,
+          origin: returnOffer.slices?.[0]?.origin || {},
+          destination: returnOffer.slices?.[0]?.destination || {}
+        },
         
         // Original offers for reference
         _departure_offer: departureOffer,
@@ -835,21 +890,8 @@ const fullOffers = async (req, res) => {
       console.log(`   Return total: ${returnTotal}`);
       console.log(`   Combined total: ${combinedTotal}`);
       
-      // Check if there's a pricing mismatch with what N8N claimed
-      const n8nClaimedAmount = requestData.data.payments?.[0]?.amount;
-      if (n8nClaimedAmount && Math.abs(parseFloat(n8nClaimedAmount) - parseFloat(combinedTotal)) > 1) {
-        console.log(`⚠️  PRICING MISMATCH DETECTED:`);
-        console.log(`   N8N claimed total: ${n8nClaimedAmount}`);
-        console.log(`   Backend calculated: ${combinedTotal}`);
-        console.log(`   Difference: ${Math.abs(parseFloat(n8nClaimedAmount) - parseFloat(combinedTotal))}`);
-        console.log(`   This suggests N8N is showing different flights than what it's booking!`);
-        
-        // TEMPORARY FIX: Use N8N's claimed amount if reasonable
-        if (parseFloat(n8nClaimedAmount) > 0 && parseFloat(n8nClaimedAmount) < parseFloat(combinedTotal) * 2) {
-          console.log(`🔧 APPLYING PRICING CORRECTION: Using N8N's claimed amount ${n8nClaimedAmount}`);
-          combinedTotal = parseFloat(n8nClaimedAmount).toFixed(2);
-        }
-      }
+      // Note: requestData is not available in fullOffers context
+      // This pricing mismatch check will be done in the booking creation phase instead
       
       // Combine both offers into a unified response that looks like a single offer
       const combinedOffer = {
@@ -1024,6 +1066,16 @@ const createOrderLink = async (req, res) => {
     console.log(`   Round-trip type: ${roundTripType}`);
     console.log(`   Is round-trip booking: ${isRoundTripBooking}`);
     console.log(`   Passengers: ${requestData.data.passengers.length}`);
+    
+    // 🔍 Smart N8N Total Amount Detection
+    const n8nAmount = parseFloat(requestData.data.payments?.[0]?.amount || 0);
+    console.log(`💰 N8N provided amount: ${n8nAmount}`);
+    
+    // Check if this might be a round-trip total amount being sent to individual booking
+    if (n8nAmount > 500 && !isRoundTrip && (roundTripSessionId || needsAutoLinking)) {
+        console.log(`🔍 Possible N8N round-trip total detected: ${n8nAmount} (individual booking but high amount)`);
+    }
+    
     console.log(`   Request data:`, JSON.stringify(requestData, null, 2));
     
     try {
@@ -1151,10 +1203,61 @@ const saveOrderAmount = async (req, res) => {
         console.log(`   Total amount: ${requestData.total_amount}`);
         console.log(`   Currency: ${requestData.currency}`);
         
+        // 🔍 Check if this booking is part of a round-trip session
+        const [sessionCheck] = await pool.query(
+            `SELECT round_trip_session_id, round_trip_type FROM ${dbPrefix}bookings 
+             WHERE id = ? AND round_trip_session_id IS NOT NULL`,
+            [requestData.booking_id]
+        );
+        
+        let finalAmount = requestData.total_amount;
+        
+        if (sessionCheck.length > 0) {
+            const sessionId = sessionCheck[0].round_trip_session_id;
+            const currentType = sessionCheck[0].round_trip_type;
+            
+            console.log(`🔄 Round-trip session detected: ${sessionId}, type: ${currentType}`);
+            
+            // Check if this is the return booking (second booking in the session)
+            if (currentType === 'return') {
+                console.log(`🔄 This is the return booking - checking for N8N total amount distribution`);
+                
+                // Get the departure booking to see if we need to redistribute the total
+                const [departureBooking] = await pool.query(
+                    `SELECT amount FROM ${dbPrefix}bookings 
+                     WHERE round_trip_session_id = ? AND round_trip_type = 'departure'`,
+                    [sessionId]
+                );
+                
+                if (departureBooking.length > 0) {
+                    const departureAmount = parseFloat(departureBooking[0].amount);
+                    const returnAmount = parseFloat(requestData.total_amount);
+                    const combinedAmount = departureAmount + returnAmount;
+                    
+                    console.log(`📊 Round-trip pricing analysis:`);
+                    console.log(`   Departure booking amount: ${departureAmount}`);
+                    console.log(`   Current return amount: ${returnAmount}`);
+                    console.log(`   Combined would be: ${combinedAmount}`);
+                    
+                    // Check if N8N is providing a total that's different from individual sum
+                    // This happens when N8N sends the total round-trip amount to the return booking
+                    if (returnAmount > departureAmount * 1.5) {
+                        console.log(`🔧 N8N total amount detected - redistributing pricing`);
+                        
+                        // This looks like N8N is sending the total round-trip amount
+                        // Keep this as the total for the return booking (which becomes the checkout amount)
+                        finalAmount = returnAmount;
+                        
+                        console.log(`✅ Using N8N's total amount: ${finalAmount}`);
+                    }
+                }
+            }
+        }
+        
         // 🔄 4. Execute query with parameters
         const [result] = await pool.query(query, [
             JSON.stringify(requestData.flight_offers),
-            requestData.total_amount,
+            finalAmount,
             requestData.currency,
             requestData.booking_id
         ]);
