@@ -447,16 +447,20 @@ const offers = async (req, res) => {
     
     try {
       // Extract departure and return offer IDs from combined ID
-      const offerParts = offerId.replace('rt_', '').split('_');
-      if (offerParts.length < 2) {
+      // Format: rt_departureOfferId_returnOfferId
+      // Duffel IDs start with "off_" so we need to find the second occurrence
+      const withoutPrefix = offerId.replace('rt_', '');
+      const secondOffIndex = withoutPrefix.indexOf('_off_');
+      
+      if (secondOffIndex === -1) {
         return res.status(400).json({
-          error: 'Invalid round-trip offer ID format',
+          error: 'Invalid round-trip offer ID format - cannot find second offer ID',
           provided: offerId
         });
       }
       
-      const departureOfferId = offerParts[0];
-      const returnOfferId = offerParts.slice(1).join('_');
+      const departureOfferId = withoutPrefix.substring(0, secondOffIndex);
+      const returnOfferId = withoutPrefix.substring(secondOffIndex + 1); // Skip the underscore
       
       console.log(`   Fetching details for departure: ${departureOfferId}, return: ${returnOfferId}`);
       
@@ -785,16 +789,19 @@ const fullOffers = async (req, res) => {
     try {
       // Extract departure and return offer IDs from combined ID
       // Format: rt_departureOfferId_returnOfferId
-      const offerParts = offerId.replace('rt_', '').split('_');
-      if (offerParts.length < 2) {
+      // Duffel IDs start with "off_" so we need to find the second occurrence
+      const withoutPrefix = offerId.replace('rt_', '');
+      const secondOffIndex = withoutPrefix.indexOf('_off_');
+      
+      if (secondOffIndex === -1) {
         return res.status(400).json({
-          error: 'Invalid round-trip offer ID format',
+          error: 'Invalid round-trip offer ID format - cannot find second offer ID',
           provided: offerId
         });
       }
       
-      const departureOfferId = offerParts[0];
-      const returnOfferId = offerParts.slice(1).join('_'); // Handle IDs with underscores
+      const departureOfferId = withoutPrefix.substring(0, secondOffIndex);
+      const returnOfferId = withoutPrefix.substring(secondOffIndex + 1); // Skip the underscore
       
       console.log(`Fetching departure: ${departureOfferId}, return: ${returnOfferId}`);
       
