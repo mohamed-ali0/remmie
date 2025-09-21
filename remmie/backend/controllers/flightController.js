@@ -835,6 +835,22 @@ const fullOffers = async (req, res) => {
       console.log(`   Return total: ${returnTotal}`);
       console.log(`   Combined total: ${combinedTotal}`);
       
+      // Check if there's a pricing mismatch with what N8N claimed
+      const n8nClaimedAmount = requestData.data.payments?.[0]?.amount;
+      if (n8nClaimedAmount && Math.abs(parseFloat(n8nClaimedAmount) - parseFloat(combinedTotal)) > 1) {
+        console.log(`⚠️  PRICING MISMATCH DETECTED:`);
+        console.log(`   N8N claimed total: ${n8nClaimedAmount}`);
+        console.log(`   Backend calculated: ${combinedTotal}`);
+        console.log(`   Difference: ${Math.abs(parseFloat(n8nClaimedAmount) - parseFloat(combinedTotal))}`);
+        console.log(`   This suggests N8N is showing different flights than what it's booking!`);
+        
+        // TEMPORARY FIX: Use N8N's claimed amount if reasonable
+        if (parseFloat(n8nClaimedAmount) > 0 && parseFloat(n8nClaimedAmount) < parseFloat(combinedTotal) * 2) {
+          console.log(`🔧 APPLYING PRICING CORRECTION: Using N8N's claimed amount ${n8nClaimedAmount}`);
+          combinedTotal = parseFloat(n8nClaimedAmount).toFixed(2);
+        }
+      }
+      
       // Combine both offers into a unified response that looks like a single offer
       const combinedOffer = {
         data: {
