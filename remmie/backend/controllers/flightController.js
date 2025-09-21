@@ -996,21 +996,58 @@ const createOrderLink = async (req, res) => {
     
     const selectedOfferId = requestData.data.selected_offers[0];
     const isRoundTrip = selectedOfferId && selectedOfferId.startsWith('rt_');
-    const roundTripSessionId = requestData.data.round_trip_session_id;
-    const roundTripType = requestData.data.round_trip_type;
-    const isRoundTripBooking = roundTripSessionId && roundTripType;
+    let roundTripSessionId = requestData.data.round_trip_session_id;
+    let roundTripType = requestData.data.round_trip_type;
+    let isRoundTripBooking = roundTripSessionId && roundTripType;
     
-    // TEMPORARY: Handle N8N that doesn't send session IDs for round-trip
-    const isOldSystemRoundTrip = isRoundTrip && !roundTripSessionId;
-    const needsAutoLinking = !isRoundTrip && !roundTripSessionId; // Individual bookings that might be part of round-trip
-    
-    if (isOldSystemRoundTrip) {
-      console.log(`⚠️  Old N8N system detected - combined offer without session ID`);
-      console.log(`   This booking will be treated as individual until N8N is updated`);
+    // HANDLE OLD N8N: If N8N sends combined rt_ ID, split it and create 2 bookings
+    if (isRoundTrip && !roundTripSessionId) {
+      console.log(`⚠️  Old N8N system detected - combined rt_ offer without session ID`);
+      console.log(`   Will split into 2 separate bookings with auto-generated session`);
+      
+      // Generate session ID for this round-trip
+      roundTripSessionId = `rt_n8n_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Split the combined ID correctly
+      const withoutPrefix = selectedOfferId.replace('rt_', '');
+      const secondOffIndex = withoutPrefix.indexOf('_off_');
+      
+      if (secondOffIndex > 0) {
+        const departureOfferId = withoutPrefix.substring(0, secondOffIndex);
+        const returnOfferId = withoutPrefix.substring(secondOffIndex + 1);
+        
+        console.log(`   Split IDs: departure=${departureOfferId}, return=${returnOfferId}`);
+        
+        // Modify request to use departure offer ID and add session info
+        requestData.data.selected_offers[0] = departureOfferId;
+        requestData.data.round_trip_session_id = roundTripSessionId;
+        requestData.data.round_trip_type = 'departure';
+        roundTripType = 'departure';
+        isRoundTripBooking = true;
+        
+        // We'll need to create the return booking separately
+        // Store return info for later processing
+        requestData._return_offer_id = returnOfferId;
+        requestData._needs_return_booking = true;
+        
+        // If N8N sent total amount, split it between the two bookings
+        const totalAmount = parseFloat(requestData.data.payments?.[0]?.amount || 0);
+        if (totalAmount > 500) {
+          console.log(`   N8N sent total amount: ${totalAmount}, will split between bookings`);
+          requestData.data.payments[0].amount = (totalAmount / 2).toFixed(2);
+          requestData._return_amount = (totalAmount / 2).toFixed(2);
+        }
+      }
     }
     
+    const needsAutoLinking = !isRoundTrip && !roundTripSessionId && false; // Disabled auto-linking
+    
     // AUTO-LINK DETECTION: Check if this might be part of a round-trip booking
-    if (needsAutoLinking) {
+    // DISABLED: Auto-linking is causing issues with N8N's current behavior
+    // Only auto-link if explicitly enabled
+    const AUTO_LINKING_ENABLED = false;
+    
+    if (AUTO_LINKING_ENABLED && needsAutoLinking) {
       const userEmail = requestData.data.passengers[0]?.email;
       if (userEmail) {
         console.log(`🔍 Checking for potential round-trip auto-linking for user: ${userEmail}`);
@@ -1022,41 +1059,46 @@ const createOrderLink = async (req, res) => {
            WHERE JSON_EXTRACT(booking_json, '$.data.passengers[0].email') = ? 
            AND created_at >= ? 
            AND round_trip_session_id IS NULL
+           AND booking_reference NOT LIKE 'rt_%'
            ORDER BY created_at DESC LIMIT 5`,
           [userEmail, tenMinutesAgo.toISOString().slice(0, 19).replace('T', ' ')]
         );
         
         console.log(`   Found ${recentBookings.length} recent bookings for auto-linking`);
         
+        // Only auto-link if we have exactly 1 recent booking and it's not a combined rt_ booking
         if (recentBookings.length === 1) {
-          // This might be the second part of a round-trip
           const firstBooking = recentBookings[0];
           const firstBookingData = JSON.parse(firstBooking.booking_json);
           const firstOfferId = firstBookingData.data.selected_offers[0];
-          const currentOfferId = selectedOfferId;
           
-          // Generate auto-session ID
-          const autoSessionId = `rt_auto_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          
-          console.log(`🔗 Auto-linking potential round-trip bookings:`);
-          console.log(`   First booking: ${firstBooking.booking_reference} (${firstOfferId})`);
-          console.log(`   Current booking: will be linked with session ${autoSessionId}`);
-          
-          // Update the first booking with session info
-          await pool.query(
-            `UPDATE ${dbPrefix}bookings 
-             SET round_trip_session_id = ?, round_trip_type = 'departure' 
-             WHERE id = ?`,
-            [autoSessionId, firstBooking.id]
-          );
-          
-          // Set current booking as return
-          requestData.data.round_trip_session_id = autoSessionId;
-          requestData.data.round_trip_type = 'return';
-          
-          console.log(`✅ Auto-linked bookings with session ID: ${autoSessionId}`);
+          // Don't auto-link if the first booking was already a combined rt_ offer
+          if (!firstOfferId.startsWith('rt_')) {
+            // Generate auto-session ID
+            const autoSessionId = `rt_auto_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            console.log(`🔗 Auto-linking potential round-trip bookings:`);
+            console.log(`   First booking: ${firstBooking.booking_reference} (${firstOfferId})`);
+            console.log(`   Current booking: will be linked with session ${autoSessionId}`);
+            
+            // Update the first booking with session info
+            await pool.query(
+              `UPDATE ${dbPrefix}bookings 
+               SET round_trip_session_id = ?, round_trip_type = 'departure' 
+               WHERE id = ?`,
+              [autoSessionId, firstBooking.id]
+            );
+            
+            // Set current booking as return
+            requestData.data.round_trip_session_id = autoSessionId;
+            requestData.data.round_trip_type = 'return';
+            
+            console.log(`✅ Auto-linked bookings with session ID: ${autoSessionId}`);
+          }
         }
       }
+    } else if (needsAutoLinking) {
+      console.log(`⚠️ Auto-linking disabled - treating as individual booking`);
     }
     
     console.log(`📝 Creating booking order link:`);
@@ -1110,6 +1152,57 @@ const createOrderLink = async (req, res) => {
       }
       
       const [result] = await pool.query(insertQuery, insertValues);
+      
+      // If this was a split rt_ booking, create the return booking now
+      if (requestData._needs_return_booking && requestData._return_offer_id) {
+        console.log(`🔄 Creating automatic return booking for split rt_ ID`);
+        
+        // Create return booking data
+        const returnBookingData = JSON.parse(JSON.stringify(requestData));
+        returnBookingData.data.selected_offers[0] = requestData._return_offer_id;
+        returnBookingData.data.round_trip_type = 'return';
+        
+        // Use the return amount if it was split
+        if (requestData._return_amount) {
+          returnBookingData.data.payments[0].amount = requestData._return_amount;
+        }
+        
+        delete returnBookingData._needs_return_booking;
+        delete returnBookingData._return_offer_id;
+        delete returnBookingData._return_amount;
+        
+        // Generate return booking reference
+        let returnBookingRef;
+        let isUniqueReturn = false;
+        while (!isUniqueReturn) {
+          returnBookingRef = `BOOK-${uuidv4().slice(0, 8).toUpperCase()}`;
+          const [existingReturn] = await pool.query(
+            `SELECT 1 FROM ${dbPrefix}bookings WHERE booking_reference = ? LIMIT 1`,
+            [returnBookingRef]
+          );
+          isUniqueReturn = existingReturn.length === 0;
+        }
+        
+        // Save return booking
+        await pool.query(
+          `INSERT INTO ${dbPrefix}bookings (booking_reference, booking_json, round_trip_session_id, round_trip_type, created_at)
+           VALUES (?, ?, ?, ?, NOW())`,
+          [returnBookingRef, JSON.stringify(returnBookingData), roundTripSessionId, 'return']
+        );
+        
+        console.log(`✅ Auto-created return booking: ${returnBookingRef}`);
+        
+        // Return the departure booking reference for checkout (it will handle both)
+        return res.status(201).json({
+          success: true,
+          message: 'Round-trip booking completed successfully (auto-split)',
+          booking_reference: bookingRef,
+          booking_id: result.insertId,
+          booking_url: `${booking_base_url}?booking_ref=${bookingRef}`,
+          round_trip_session_id: roundTripSessionId,
+          is_round_trip_complete: true
+        });
+      }
       
       // For round-trip bookings, check if this completes the pair
       if (isRoundTripBooking) {
