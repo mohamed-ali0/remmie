@@ -994,8 +994,8 @@ const createOrderLink = async (req, res) => {
       return res.status(400).json({ message: 'Invalid or incomplete flight booking data.' });
     }
     
-    const selectedOfferId = requestData.data.selected_offers[0];
-    const isRoundTrip = selectedOfferId && selectedOfferId.startsWith('rt_');
+    let selectedOfferId = requestData.data.selected_offers[0];
+    let isRoundTrip = selectedOfferId && selectedOfferId.startsWith('rt_');
     let roundTripSessionId = requestData.data.round_trip_session_id;
     let roundTripType = requestData.data.round_trip_type;
     let isRoundTripBooking = roundTripSessionId && roundTripType;
@@ -1040,48 +1040,56 @@ const createOrderLink = async (req, res) => {
       }
     }
     
-    const needsAutoLinking = !isRoundTrip && !roundTripSessionId && false; // Disabled auto-linking
+    // TIME-WINDOW AUTO-LINKING: Link bookings within 1 minute window
+    const TIME_WINDOW_SECONDS = 60; // 1 minute window for round-trip bookings
+    const needsAutoLinking = !isRoundTrip && !roundTripSessionId;
     
-    // AUTO-LINK DETECTION: Check if this might be part of a round-trip booking
-    // DISABLED: Auto-linking is causing issues with N8N's current behavior
-    // Only auto-link if explicitly enabled
-    const AUTO_LINKING_ENABLED = false;
-    
-    if (AUTO_LINKING_ENABLED && needsAutoLinking) {
+    if (needsAutoLinking) {
       const userEmail = requestData.data.passengers[0]?.email;
       if (userEmail) {
-        console.log(`🔍 Checking for potential round-trip auto-linking for user: ${userEmail}`);
+        console.log(`🕐 TIME-WINDOW AUTO-LINKING: Checking for bookings within ${TIME_WINDOW_SECONDS} seconds`);
         
-        // Look for recent bookings by the same user (within last 10 minutes)
-        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+        // Look for bookings by the same user within the time window
+        const timeWindowStart = new Date(Date.now() - TIME_WINDOW_SECONDS * 1000);
         const [recentBookings] = await pool.query(
           `SELECT * FROM ${dbPrefix}bookings 
            WHERE JSON_EXTRACT(booking_json, '$.data.passengers[0].email') = ? 
            AND created_at >= ? 
            AND round_trip_session_id IS NULL
-           AND booking_reference NOT LIKE 'rt_%'
-           ORDER BY created_at DESC LIMIT 5`,
-          [userEmail, tenMinutesAgo.toISOString().slice(0, 19).replace('T', ' ')]
+           AND JSON_EXTRACT(booking_json, '$.data.selected_offers[0]') NOT LIKE 'rt_%'
+           ORDER BY created_at DESC LIMIT 1`,
+          [userEmail, timeWindowStart.toISOString().slice(0, 19).replace('T', ' ')]
         );
         
-        console.log(`   Found ${recentBookings.length} recent bookings for auto-linking`);
+        console.log(`   Found ${recentBookings.length} booking(s) within ${TIME_WINDOW_SECONDS}s window`);
         
-        // Only auto-link if we have exactly 1 recent booking and it's not a combined rt_ booking
         if (recentBookings.length === 1) {
           const firstBooking = recentBookings[0];
           const firstBookingData = JSON.parse(firstBooking.booking_json);
-          const firstOfferId = firstBookingData.data.selected_offers[0];
           
-          // Don't auto-link if the first booking was already a combined rt_ offer
-          if (!firstOfferId.startsWith('rt_')) {
+          // Check if bookings are for opposite directions (departure vs return)
+          const firstSlice = firstBookingData.data.slices?.[0] || {};
+          const currentSlice = requestData.data.slices?.[0] || {};
+          
+          // Auto-link if origins and destinations are swapped (indicating return flight)
+          const isReturnFlight = (
+            firstSlice.origin === currentSlice.destination && 
+            firstSlice.destination === currentSlice.origin
+          ) || (
+            // Or just link any 2 bookings within time window for same user
+            true // Simplified: any 2 bookings within 1 minute are considered round-trip
+          );
+          
+          if (isReturnFlight) {
             // Generate auto-session ID
             const autoSessionId = `rt_auto_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             
-            console.log(`🔗 Auto-linking potential round-trip bookings:`);
-            console.log(`   First booking: ${firstBooking.booking_reference} (${firstOfferId})`);
-            console.log(`   Current booking: will be linked with session ${autoSessionId}`);
+            console.log(`🔗 AUTO-LINKING ROUND-TRIP (Time Window):`);
+            console.log(`   First booking: ${firstBooking.booking_reference} (created ${Math.round((Date.now() - new Date(firstBooking.created_at).getTime()) / 1000)}s ago)`);
+            console.log(`   Current booking: will be linked as return`);
+            console.log(`   Session ID: ${autoSessionId}`);
             
-            // Update the first booking with session info
+            // Update the first booking as departure
             await pool.query(
               `UPDATE ${dbPrefix}bookings 
                SET round_trip_session_id = ?, round_trip_type = 'departure' 
@@ -1092,13 +1100,16 @@ const createOrderLink = async (req, res) => {
             // Set current booking as return
             requestData.data.round_trip_session_id = autoSessionId;
             requestData.data.round_trip_type = 'return';
+            roundTripSessionId = autoSessionId;
+            roundTripType = 'return';
+            isRoundTripBooking = true;
             
-            console.log(`✅ Auto-linked bookings with session ID: ${autoSessionId}`);
+            console.log(`✅ Successfully linked bookings with session: ${autoSessionId}`);
           }
+        } else if (recentBookings.length === 0) {
+          console.log(`   This appears to be the first booking (departure) - will wait for return`);
         }
       }
-    } else if (needsAutoLinking) {
-      console.log(`⚠️ Auto-linking disabled - treating as individual booking`);
     }
     
     console.log(`📝 Creating booking order link:`);
@@ -1219,29 +1230,36 @@ const createOrderLink = async (req, res) => {
           const departureBooking = sessionBookings.find(b => b.round_trip_type === 'departure');
           const returnBooking = sessionBookings.find(b => b.round_trip_type === 'return');
           
-          console.log(`✅ Round-trip complete! Departure: ${departureBooking.booking_reference}, Return: ${returnBooking.booking_reference}`);
+          console.log(`✅ ROUND-TRIP COMPLETE!`);
+          console.log(`   Departure: ${departureBooking.booking_reference}`);
+          console.log(`   Return: ${returnBooking.booking_reference}`);
+          console.log(`   Checkout URL: ${booking_base_url}?booking_ref=${departureBooking.booking_reference}`);
           
           // Return the departure booking reference for checkout (it will handle both)
           return res.status(201).json({
             success: true,
             message: 'Round-trip booking completed successfully',
             booking_reference: departureBooking.booking_reference,
+            return_booking_reference: returnBooking.booking_reference,
             booking_id: result.insertId,
             booking_url: `${booking_base_url}?booking_ref=${departureBooking.booking_reference}`,
             round_trip_session_id: roundTripSessionId,
-            is_round_trip_complete: true
+            is_round_trip_complete: true,
+            checkout_message: "Both flights booked! Proceed to payment for your complete round-trip."
           });
         } else {
-          // Only one part of round-trip is complete
-          console.log(`⏳ Round-trip partial (${roundTripType} completed)`);
+          // Only one part of round-trip is complete - don't show payment link yet
+          console.log(`⏳ Round-trip partial (${roundTripType} completed) - waiting for second booking`);
           
           return res.status(201).json({
             success: true,
-            message: `Round-trip ${roundTripType} booking saved, waiting for ${roundTripType === 'departure' ? 'return' : 'departure'}`,
+            message: `Round-trip ${roundTripType} booking saved, processing ${roundTripType === 'departure' ? 'return' : 'departure'} flight...`,
             booking_reference: bookingRef,
             booking_id: result.insertId,
             round_trip_session_id: roundTripSessionId,
-            is_round_trip_complete: false
+            is_round_trip_complete: false,
+            // Don't include booking_url yet - wait for both bookings
+            waiting_message: "First flight saved. Please wait while we process your return flight..."
           });
         }
       } else {
