@@ -438,19 +438,183 @@ function filterDuffelResponse(data) {
 // };
 const offers = async (req, res) => {
   const offerId = req.query.offer_id;
-  const baseUrl = `${duffel_api_url}/air/offers/${offerId}`;
-
-  try {
-    const response = await axios.get(baseUrl, {
-      headers: {
-        'Accept-Encoding': 'gzip',
-        'Accept': 'application/json',
-        'Duffel-Version': 'v2',
-        'Authorization': `Bearer ${duffel_access_tokens}`
+  
+  // Check if this is a round-trip combined offer ID
+  const isRoundTrip = offerId && offerId.startsWith('rt_');
+  
+  if (isRoundTrip) {
+    console.log('🔄 Get Offer Details: Processing round-trip combined ID:', offerId);
+    
+    try {
+      // Extract departure and return offer IDs from combined ID
+      const offerParts = offerId.replace('rt_', '').split('_');
+      if (offerParts.length < 2) {
+        return res.status(400).json({
+          error: 'Invalid round-trip offer ID format',
+          provided: offerId
+        });
       }
-    });
+      
+      const departureOfferId = offerParts[0];
+      const returnOfferId = offerParts.slice(1).join('_');
+      
+      console.log(`   Fetching details for departure: ${departureOfferId}, return: ${returnOfferId}`);
+      
+      // Fetch both offers in parallel
+      const [departureResponse, returnResponse] = await Promise.all([
+        axios.get(`${duffel_api_url}/air/offers/${departureOfferId}`, {
+          headers: {
+            'Accept-Encoding': 'gzip',
+            'Accept': 'application/json',
+            'Duffel-Version': 'v2',
+            'Authorization': `Bearer ${duffel_access_tokens}`
+          }
+        }),
+        axios.get(`${duffel_api_url}/air/offers/${returnOfferId}`, {
+          headers: {
+            'Accept-Encoding': 'gzip',
+            'Accept': 'application/json',
+            'Duffel-Version': 'v2',
+            'Authorization': `Bearer ${duffel_access_tokens}`
+          }
+        })
+      ]);
+      
+      // Process and combine the data like the original offers endpoint
+      const departureData = departureResponse.data.data;
+      const returnData = returnResponse.data.data;
+      
+      // Combine slices from both flights
+      const combinedSlices = [
+        ...departureData.slices.map(slice => ({
+          origin: {
+            airport_code: slice.origin?.iata_code || null,
+            city_name: slice.origin?.city_name || null,
+            country_name: slice.origin?.country_name || null,
+            name: slice.origin?.name || null
+          },
+          destination: {
+            airport_code: slice.destination?.iata_code || null,
+            city_name: slice.destination?.city_name || null,
+            country_name: slice.destination?.country_name || null,
+            name: slice.destination?.name || null
+          },
+          duration: slice.duration || null,
+          segments: (slice.segments || []).map(seg => ({
+            marketing_carrier: {
+              code: seg.marketing_carrier?.iata_code || null,
+              name: seg.marketing_carrier?.name || null
+            },
+            operating_carrier: {
+              code: seg.operating_carrier?.iata_code || null,
+              name: seg.operating_carrier?.name || null
+            },
+            departure: {
+              airport_code: seg.departure_airport?.iata_code || null,
+              at: seg.departing_at || null
+            },
+            arrival: {
+              airport_code: seg.arrival_airport?.iata_code || null,
+              at: seg.arriving_at || null
+            },
+            duration: seg.duration || null
+          }))
+        })),
+        ...returnData.slices.map(slice => ({
+          origin: {
+            airport_code: slice.origin?.iata_code || null,
+            city_name: slice.origin?.city_name || null,
+            country_name: slice.origin?.country_name || null,
+            name: slice.origin?.name || null
+          },
+          destination: {
+            airport_code: slice.destination?.iata_code || null,
+            city_name: slice.destination?.city_name || null,
+            country_name: slice.destination?.country_name || null,
+            name: slice.destination?.name || null
+          },
+          duration: slice.duration || null,
+          segments: (slice.segments || []).map(seg => ({
+            marketing_carrier: {
+              code: seg.marketing_carrier?.iata_code || null,
+              name: seg.marketing_carrier?.name || null
+            },
+            operating_carrier: {
+              code: seg.operating_carrier?.iata_code || null,
+              name: seg.operating_carrier?.name || null
+            },
+            departure: {
+              airport_code: seg.departure_airport?.iata_code || null,
+              at: seg.departing_at || null
+            },
+            arrival: {
+              airport_code: seg.arrival_airport?.iata_code || null,
+              at: seg.arriving_at || null
+            },
+            duration: seg.duration || null
+          }))
+        }))
+      ];
+      
+      // Combine passengers from both flights (should be the same)
+      const combinedPassengers = departureData.passengers.map(p => ({
+        loyalty_programme_accounts: p.loyalty_programme_accounts || [],
+        family_name: p.family_name || null,
+        given_name: p.given_name || null,
+        age: p.age || null,
+        type: p.type || null,
+        passengers_id: p.id || null
+      }));
+      
+      // Calculate combined totals
+      const combinedTotal = (
+        parseFloat(departureData.total_amount) + 
+        parseFloat(returnData.total_amount)
+      ).toFixed(2);
+      
+      console.log(`🔢 Combined offer details totals:`);
+      console.log(`   Departure: ${departureData.total_amount}`);
+      console.log(`   Return: ${returnData.total_amount}`);
+      console.log(`   Combined: ${combinedTotal}`);
+      
+      const combinedResponse = {
+        data: {
+          id: offerId,
+          slices: combinedSlices,
+          owner: departureData.owner,
+          conditions: departureData.conditions,
+          passengers: combinedPassengers,
+          total_amount: combinedTotal,
+          total_currency: departureData.total_currency,
+          trip_type: 'round_trip'
+        }
+      };
+      
+      res.status(200).json(combinedResponse);
+      
+    } catch (error) {
+      console.error('Round-trip offer details error:', error.message);
+      res.status(error.response?.status || 500).json({
+        error: 'Failed to fetch round-trip offer details',
+        detail: error.response?.data || error.message
+      });
+    }
+    
+  } else {
+    // One-way offer (original logic)
+    const baseUrl = `${duffel_api_url}/air/offers/${offerId}`;
 
-    const data = response.data.data;
+    try {
+      const response = await axios.get(baseUrl, {
+        headers: {
+          'Accept-Encoding': 'gzip',
+          'Accept': 'application/json',
+          'Duffel-Version': 'v2',
+          'Authorization': `Bearer ${duffel_access_tokens}`
+        }
+      });
+
+      const data = response.data.data;
     // Filtered slices data
     const slices = (data.slices || []).map(slice => ({
       origin: {
@@ -507,15 +671,16 @@ const offers = async (req, res) => {
         total_currency: data.total_currency
       }
     };
-    res.status(200).json(shortJson);
+      res.status(200).json(shortJson);
 
-  } catch (error) {
-    console.error('Duffel API Error:', error.response?.data || error.message);
-    res.status(error.response?.status || 500).json({
-      error: 'Duffel API failed',
-      url: baseUrl,
-      detail: error.response?.data || error.message
-    });
+    } catch (error) {
+      console.error('Duffel API Error:', error.response?.data || error.message);
+      res.status(error.response?.status || 500).json({
+        error: 'Duffel API failed',
+        url: baseUrl,
+        detail: error.response?.data || error.message
+      });
+    }
   }
 };
 
@@ -674,6 +839,15 @@ const createOrderLink = async (req, res) => {
     if (!requestData || !requestData.data || !requestData.data.selected_offers || !requestData.data.passengers || !requestData.data.payments) {
       return res.status(400).json({ message: 'Invalid or incomplete flight booking data.' });
     }
+    
+    const selectedOfferId = requestData.data.selected_offers[0];
+    const isRoundTrip = selectedOfferId && selectedOfferId.startsWith('rt_');
+    
+    console.log(`📝 Creating booking order link:`);
+    console.log(`   Selected offer ID: ${selectedOfferId}`);
+    console.log(`   Is round-trip: ${isRoundTrip}`);
+    console.log(`   Passengers: ${requestData.data.passengers.length}`);
+    console.log(`   Request data:`, JSON.stringify(requestData, null, 2));
     
     try {
       let bookingRef;
