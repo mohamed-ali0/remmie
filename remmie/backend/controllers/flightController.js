@@ -942,6 +942,65 @@ const createOrderLink = async (req, res) => {
     const roundTripType = requestData.data.round_trip_type;
     const isRoundTripBooking = roundTripSessionId && roundTripType;
     
+    // TEMPORARY: Handle N8N that doesn't send session IDs for round-trip
+    const isOldSystemRoundTrip = isRoundTrip && !roundTripSessionId;
+    const needsAutoLinking = !isRoundTrip && !roundTripSessionId; // Individual bookings that might be part of round-trip
+    
+    if (isOldSystemRoundTrip) {
+      console.log(`⚠️  Old N8N system detected - combined offer without session ID`);
+      console.log(`   This booking will be treated as individual until N8N is updated`);
+    }
+    
+    // AUTO-LINK DETECTION: Check if this might be part of a round-trip booking
+    if (needsAutoLinking) {
+      const userEmail = requestData.data.passengers[0]?.email;
+      if (userEmail) {
+        console.log(`🔍 Checking for potential round-trip auto-linking for user: ${userEmail}`);
+        
+        // Look for recent bookings by the same user (within last 10 minutes)
+        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+        const [recentBookings] = await pool.query(
+          `SELECT * FROM ${dbPrefix}bookings 
+           WHERE JSON_EXTRACT(booking_json, '$.data.passengers[0].email') = ? 
+           AND created_at >= ? 
+           AND round_trip_session_id IS NULL
+           ORDER BY created_at DESC LIMIT 5`,
+          [userEmail, tenMinutesAgo.toISOString().slice(0, 19).replace('T', ' ')]
+        );
+        
+        console.log(`   Found ${recentBookings.length} recent bookings for auto-linking`);
+        
+        if (recentBookings.length === 1) {
+          // This might be the second part of a round-trip
+          const firstBooking = recentBookings[0];
+          const firstBookingData = JSON.parse(firstBooking.booking_json);
+          const firstOfferId = firstBookingData.data.selected_offers[0];
+          const currentOfferId = selectedOfferId;
+          
+          // Generate auto-session ID
+          const autoSessionId = `rt_auto_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          
+          console.log(`🔗 Auto-linking potential round-trip bookings:`);
+          console.log(`   First booking: ${firstBooking.booking_reference} (${firstOfferId})`);
+          console.log(`   Current booking: will be linked with session ${autoSessionId}`);
+          
+          // Update the first booking with session info
+          await pool.query(
+            `UPDATE ${dbPrefix}bookings 
+             SET round_trip_session_id = ?, round_trip_type = 'departure' 
+             WHERE id = ?`,
+            [autoSessionId, firstBooking.id]
+          );
+          
+          // Set current booking as return
+          requestData.data.round_trip_session_id = autoSessionId;
+          requestData.data.round_trip_type = 'return';
+          
+          console.log(`✅ Auto-linked bookings with session ID: ${autoSessionId}`);
+        }
+      }
+    }
+    
     console.log(`📝 Creating booking order link:`);
     console.log(`   Selected offer ID: ${selectedOfferId}`);
     console.log(`   Is round-trip: ${isRoundTrip}`);

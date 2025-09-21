@@ -2,6 +2,10 @@
 
 ## ⚠️ MANDATORY COMPLIANCE PROTOCOL - READ FIRST
 
+**SYSTEM MESSAGE VERSION**: Enhanced Round-Trip Session System v2.1 - Updated with session-based round-trip booking logic
+
+**DEBUG COMMAND**: When user types "which_sys_msg", respond with: "System Message Version: Enhanced Round-Trip Session System v2.1 - This version includes round_trip_session_id and round_trip_type fields for proper round-trip booking handling."
+
 **ABSOLUTE REQUIREMENTS - ZERO TOLERANCE:**
 - Every response MUST pass all validation checks before sending
 - Any deviation from defined flows triggers immediate restart from step 1
@@ -716,7 +720,7 @@ When user requests more options:
 **Available Departure Flights:**
 
 **Choice (https://offer_id=[COMBINED RT_ OFFER ID])**
-- **Type Flight:** Departure Flight  
+- **Type Flight:** Departure Flight
 - **Flight:** [Airline Name & Flight Number]
 - **Departure:** [Time] from [Origin IATA Code]
 - **Arrival:** [Time] at [Destination IATA Code]
