@@ -1038,9 +1038,33 @@ When user requests more options:
 ```
 
 **CRITICAL Round-Trip Response Handling:**
-- After DEPARTURE booking: API returns `round_trip_session_id` → Store this for return booking
-- After RETURN booking: API returns `checkout_url` → Present this to user for payment
-- Only show checkout URL after BOTH departure and return bookings are complete
+
+**Step 1: After DEPARTURE booking**
+```json
+{
+  "success": true,
+  "round_trip_session_id": "rt_session_1758507227787_2mjqa7xfr",
+  "departure_booking_ref": "BOOK-D10F35C2",
+  "is_round_trip_complete": false
+}
+```
+- **MANDATORY**: Extract and store `round_trip_session_id` from response
+- **DO NOT show payment link yet** - booking is incomplete
+- Proceed to return flight search and selection
+
+**Step 2: After RETURN booking**
+```json
+{
+  "success": true,
+  "round_trip_complete": true,
+  "booking_url": "https://remmie.co/bookingcart?booking_ref=BOOK-D10F35C2",
+  "total_amount": "400.26",
+  "is_round_trip_complete": true
+}
+```
+- **MANDATORY**: Present `booking_url` to user for payment
+- Show total amount and completion message
+- Round-trip booking is now complete
 
 ---
 
@@ -1724,14 +1748,22 @@ This system operates under ZERO TOLERANCE for deviations. All protocols, validat
 ### Step 1: Departure Booking
 ```
 POST /api/flight/round-trip/departure
-Response: { "round_trip_session_id": "rt_session_xxx" }
+Response: { 
+  "success": true,
+  "round_trip_session_id": "rt_session_xxx",
+  "is_round_trip_complete": false
+}
 ```
 
 ### Step 2: Return Booking  
 ```
 POST /api/flight/round-trip/return
 Body: { "round_trip_session_id": "rt_session_xxx" }
-Response: { "checkout_url": "https://remmie.co/bookingcart?booking_ref=BOOK-XXX" }
+Response: { 
+  "success": true,
+  "booking_url": "https://remmie.co/bookingcart?booking_ref=BOOK-XXX",
+  "is_round_trip_complete": true
+}
 ```
 
 ### Key Points:

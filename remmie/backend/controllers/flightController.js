@@ -1669,6 +1669,8 @@ const createRoundTripDeparture = async (req, res) => {
         round_trip_session_id: sessionId,
         departure_booking_ref: bookingRef,
         departure_booking_id: result.insertId,
+        booking_reference: bookingRef, // N8N might expect this field name
+        booking_id: result.insertId, // N8N might expect this field name  
         message: 'Departure flight booked successfully. Please book your return flight.',
         next_step: 'book_return_flight',
         is_round_trip_complete: false
@@ -1756,7 +1758,8 @@ const createRoundTripReturn = async (req, res) => {
         return_booking_ref: returnBookingRef,
         departure_booking_id: departureBooking.id,
         return_booking_id: result.insertId,
-        checkout_url: `${booking_base_url}?booking_ref=${departureBooking.booking_reference}`,
+        booking_url: `${booking_base_url}?booking_ref=${departureBooking.booking_reference}`, // N8N expects this field name
+        checkout_url: `${booking_base_url}?booking_ref=${departureBooking.booking_reference}`, // Keep for compatibility
         total_amount: totalAmount,
         departure_amount: departureAmount.toFixed(2),
         return_amount: returnAmount.toFixed(2),
