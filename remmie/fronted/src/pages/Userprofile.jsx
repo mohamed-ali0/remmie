@@ -40,7 +40,7 @@ export default function Userprofile() {
   useEffect(() => {
     if (checkAndLogoutIfExpired(navigate)) return;
     const token = getToken();
-    axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/auth/user-info`, {}, {
+    axios.post(`${import.meta.env.VITE_API_URL}/api/auth/user-info`, {}, {
       headers: { Authorization: `Bearer ${token}` }
     }).then(res => {
       setUserInfo(res.data.data);
@@ -81,7 +81,7 @@ export default function Userprofile() {
     if (userInfo.profile_image instanceof File) formData.append('profile_image', userInfo.profile_image);
 
     try {
-      await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/auth/user-info-update`, formData, {
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/user-info-update`, formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       alert('Profile updated successfully');

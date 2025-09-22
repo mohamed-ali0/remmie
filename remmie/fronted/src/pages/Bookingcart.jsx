@@ -89,7 +89,7 @@ const BookingCart = () => {
             try {
                 // Step 1: Get booking details from your database
                 const { data: bookingData } = await axios.post(
-                    `${import.meta.env.VITE_API_BASE_URL}/api/booking/get-booking-byref`,
+                    `${import.meta.env.VITE_API_URL}/api/booking/get-booking-byref`,
                     { booking_ref: ref },
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
@@ -150,7 +150,7 @@ const BookingCart = () => {
                         // For round-trip, we need to fetch offers using the round-trip session
                         // The fullOffers endpoint can handle this with booking_ref parameter
                         const { data } = await axios.post(
-                            `${import.meta.env.VITE_API_BASE_URL}/api/flight/full-offers?booking_ref=${ref}`,
+                            `${import.meta.env.VITE_API_URL}/api/flight/full-offers?booking_ref=${ref}`,
                             {},
                             { headers: { Authorization: `Bearer ${token}` } }
                         );
@@ -162,7 +162,7 @@ const BookingCart = () => {
                         // For one-way, use the original logic
                         offerId = bookingJson.data.selected_offers[0];
                         const { data } = await axios.post(
-                            `${import.meta.env.VITE_API_BASE_URL}/api/flight/full-offers?offer_id=${offerId}`,
+                            `${import.meta.env.VITE_API_URL}/api/flight/full-offers?offer_id=${offerId}`,
                             {},
                             { headers: { Authorization: `Bearer ${token}` } }
                         );
@@ -187,7 +187,7 @@ const BookingCart = () => {
                         console.log('   Has return slice:', offerData?.data?.slices?.[1]?.segments?.length > 0);
                         
                         // Send to backend
-                       await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/flight/save-order-amount`, {
+                       await axios.post(`${import.meta.env.VITE_API_URL}/api/flight/save-order-amount`, {
                           data: {
                             booking_id: bookingData.id,
                             flight_offers:offerData,
@@ -378,7 +378,7 @@ const BookingCart = () => {
 
             // Send data to backend
             const { data } = await axios.post(
-                `${import.meta.env.VITE_API_BASE_URL}/api/stripe/create-flight-payment-session`,
+                `${import.meta.env.VITE_API_URL}/api/stripe/create-flight-payment-session`,
                 {
                     booking_ref: bookingRef,
                     contact: formData.contact,
@@ -389,6 +389,8 @@ const BookingCart = () => {
             );
 
             // Handle different response types
+            console.log('Payment response:', data);
+            
             if (data.status === 'choose_payment_method') {
                 // Ask user to choose payment method
                 const choice = window.confirm(
@@ -397,8 +399,9 @@ const BookingCart = () => {
                 
                 if (choice) {
                     // User chose to use saved payment method
+                    console.log('User chose to use saved payment method');
                     const { data: savedData } = await axios.post(
-                        `${import.meta.env.VITE_API_BASE_URL}/api/stripe/create-flight-payment-session`,
+                        `${import.meta.env.VITE_API_URL}/api/stripe/create-flight-payment-session`,
                         {
                             booking_ref: bookingRef,
                             contact: formData.contact,
@@ -407,11 +410,18 @@ const BookingCart = () => {
                         },
                         { headers: { Authorization: `Bearer ${token}` } }
                     );
-                    window.location.href = savedData.url;
+                    console.log('Saved payment response:', savedData);
+                    if (savedData.url) {
+                        window.location.href = savedData.url;
+                    } else {
+                        console.error('No URL in saved payment response:', savedData);
+                        alert('Payment processing failed. Please try again.');
+                    }
                 } else {
                     // User chose to use new payment method - create new session
+                    console.log('User chose to use new payment method');
                     const { data: newData } = await axios.post(
-                        `${import.meta.env.VITE_API_BASE_URL}/api/stripe/create-flight-payment-session`,
+                        `${import.meta.env.VITE_API_URL}/api/stripe/create-flight-payment-session`,
                         {
                             booking_ref: bookingRef,
                             contact: formData.contact,
@@ -420,10 +430,17 @@ const BookingCart = () => {
                         },
                         { headers: { Authorization: `Bearer ${token}` } }
                     );
-                    window.location.href = newData.url;
+                    console.log('New payment response:', newData);
+                    if (newData.url) {
+                        window.location.href = newData.url;
+                    } else {
+                        console.error('No URL in new payment response:', newData);
+                        alert('Payment processing failed. Please try again.');
+                    }
                 }
             } else if (data.url) {
                 // Normal redirect to Stripe
+                console.log('Normal redirect to:', data.url);
                 window.location.href = data.url;
             } else {
                 console.error('Unexpected payment response:', data);
@@ -443,7 +460,7 @@ const BookingCart = () => {
     //     try {
     //         setPaying(true);
     //         const { data } = await axios.post(
-    //             `${import.meta.env.VITE_API_BASE_URL}/api/stripe/create-flight-payment-session`,
+    //             `${import.meta.env.VITE_API_URL}/api/stripe/create-flight-payment-session`,
     //             { booking_ref: bookingRef },
     //             { headers: { Authorization: `Bearer ${token}` } }
     //         );

@@ -18,7 +18,7 @@ export const signupSchema = yup.object().shape({
     .test('check-email', 'Email already registered', async (value) => {
       if (value) {
         try {
-          const checkRes = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/auth/check-email`, { email: value });
+          const checkRes = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/check-email`, { email: value });
           return !checkRes.data.exists; // Return false if email exists, true if it doesn't
         } catch (error) {
           console.error('Error checking email:', error);

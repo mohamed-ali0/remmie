@@ -103,7 +103,7 @@ const StayCart = () => {
 
             try {
                 const { data: bookingData } = await axios.post(
-                    `${import.meta.env.VITE_API_BASE_URL}/api/booking/get-booking-byref`,
+                    `${import.meta.env.VITE_API_URL}/api/booking/get-booking-byref`,
                     { booking_ref: ref },
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
@@ -130,13 +130,13 @@ const StayCart = () => {
                     const quoteId = bookingJson.data.quote_id;
                     
                     const { data: stayData } = await axios.post(
-                        `${import.meta.env.VITE_API_BASE_URL}/api/stays/stays-quotes-by-id?quote_id=${quoteId}`,
+                        `${import.meta.env.VITE_API_URL}/api/stays/stays-quotes-by-id?quote_id=${quoteId}`,
                         {},
                         { headers: { Authorization: `Bearer ${token}` } }
                     );
 
                     // Send to backend
-                   await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/stays/save-stay-amount`, {
+                   await axios.post(`${import.meta.env.VITE_API_URL}/api/stays/save-stay-amount`, {
                       data: {
                         booking_id: bookingData.id,
                         stays_quotes:stayData,
@@ -218,7 +218,7 @@ const StayCart = () => {
         
         try {
             const response = await axios.post(
-                `${import.meta.env.VITE_API_BASE_URL}/api/stripe/create-stay-payment-session`,
+                `${import.meta.env.VITE_API_URL}/api/stripe/create-stay-payment-session`,
                 {
                     booking_ref: bookingRef,
                     guest_details: {
