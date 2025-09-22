@@ -26,9 +26,9 @@ async function createFlightPaymentSession(req, res) {
         ]
       );
 
-    // 1. Load booking details
+    // 1. Load booking details - handle round-trip
     const [[booking]] = await pool.query(
-      `SELECT amount, currency 
+      `SELECT amount, currency, round_trip_session_id, round_trip_type 
          FROM ${dbPrefix}bookings 
         WHERE booking_reference = ? AND user_id = ? 
         LIMIT 1`,
@@ -39,12 +39,32 @@ async function createFlightPaymentSession(req, res) {
       return res.status(404).json({ message: 'Booking not found' });
     }
 
-    const unitAmount = Math.round(booking.amount * 100);
+    let totalAmount = booking.amount;
+    let currency = booking.currency;
+    
+    // For round-trip, calculate total amount from both bookings
+    if (booking.round_trip_session_id) {
+      console.log(`🔄 Round-trip payment detected: ${booking.round_trip_session_id}`);
+      
+      const [sessionBookings] = await pool.query(
+        `SELECT amount, currency FROM ${dbPrefix}bookings 
+         WHERE round_trip_session_id = ? AND user_id = ?`,
+        [booking.round_trip_session_id, userId]
+      );
+      
+      if (sessionBookings.length === 2) {
+        totalAmount = sessionBookings.reduce((sum, b) => sum + parseFloat(b.amount), 0);
+        console.log(`   Departure + Return: ${sessionBookings.map(b => `$${b.amount}`).join(' + ')} = $${totalAmount}`);
+      }
+    }
+
+    const unitAmount = Math.round(totalAmount * 100);
     
     console.log(`💳 Creating flight payment session:`);
     console.log(`   Booking ref: ${booking_ref}`);
-    console.log(`   Database amount: ${booking.amount}`);
-    console.log(`   Currency: ${booking.currency}`);
+    console.log(`   Is round-trip: ${!!booking.round_trip_session_id}`);
+    console.log(`   Total amount: ${totalAmount}`);
+    console.log(`   Currency: ${currency}`);
     console.log(`   Stripe unit amount: ${unitAmount} (amount * 100)`);
 
     // 2. Get Stripe customer ID

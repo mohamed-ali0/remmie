@@ -90,8 +90,33 @@ const getBookingByRef = async (req, res) => {
       return res.status(403).json({ message: 'You do not have access to this booking' });
     }
 
-    // 4) Return the (possibly updated) booking
-    return res.json(booking);
+    // 4) Check if this is a round-trip booking and fetch the companion booking
+    let companionBooking = null;
+    if (booking.round_trip_session_id) {
+      console.log(`🔍 Round-trip detected: ${booking.round_trip_session_id}`);
+      
+      // Find the other booking in the same round-trip session
+      const [companionRows] = await pool.query(
+        `SELECT * FROM ${dbPrefix}bookings 
+         WHERE round_trip_session_id = ? AND id != ? AND user_id = ?
+         LIMIT 1`,
+        [booking.round_trip_session_id, booking.id, userId]
+      );
+      
+      if (companionRows.length > 0) {
+        companionBooking = companionRows[0];
+        console.log(`✅ Found companion booking: ${companionBooking.booking_reference} (${companionBooking.round_trip_type})`);
+      }
+    }
+
+    // 5) Return the booking(s) with round-trip information
+    const response = {
+      ...booking,
+      is_round_trip: !!booking.round_trip_session_id,
+      companion_booking: companionBooking
+    };
+    
+    return res.json(response);
   } catch (err) {
     console.error('Error fetching or assigning booking:', err);
     return res.status(500).json({ message: 'Server error' });

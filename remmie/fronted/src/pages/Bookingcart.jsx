@@ -99,6 +99,14 @@ const BookingCart = () => {
                     ? JSON.parse(bookingData.booking_json) 
                     : bookingData.booking_json;
 
+                console.log('🔍 Booking data received:', {
+                    booking_ref: ref,
+                    is_round_trip: bookingData.is_round_trip,
+                    round_trip_session_id: bookingData.round_trip_session_id,
+                    round_trip_type: bookingData.round_trip_type,
+                    has_companion: !!bookingData.companion_booking
+                });
+
                 // Extract passenger details from booking_json
                 const passengers = bookingJson.data?.passengers || [];
                 setPassengerDetails(bookingJson.data?.passengers || []);
@@ -129,14 +137,33 @@ const BookingCart = () => {
                         }))
                     });
 
-                // Step 2: Fetch offer details using the offer_id from booking_json
+                // Step 2: Fetch offer details - handle round-trip vs one-way
                 if (bookingJson.data?.selected_offers?.length > 0) {
-                    const offerId = bookingJson.data.selected_offers[0];
-                    const { data: offerData } = await axios.post(
-                        `${import.meta.env.VITE_API_BASE_URL}/api/flight/full-offers?offer_id=${offerId}`,
-                        {},
-                        { headers: { Authorization: `Bearer ${token}` } }
-                    );
+                    let offerData;
+                    
+                    if (bookingData.is_round_trip && bookingData.companion_booking) {
+                        console.log('🔄 Fetching round-trip offer details');
+                        
+                        // For round-trip, we need to fetch offers using the round-trip session
+                        // The fullOffers endpoint can handle this with booking_ref parameter
+                        const { data } = await axios.post(
+                            `${import.meta.env.VITE_API_BASE_URL}/api/flight/full-offers?booking_ref=${ref}`,
+                            {},
+                            { headers: { Authorization: `Bearer ${token}` } }
+                        );
+                        offerData = data;
+                    } else {
+                        console.log('✈️ Fetching one-way offer details');
+                        
+                        // For one-way, use the original logic
+                        const offerId = bookingJson.data.selected_offers[0];
+                        const { data } = await axios.post(
+                            `${import.meta.env.VITE_API_BASE_URL}/api/flight/full-offers?offer_id=${offerId}`,
+                            {},
+                            { headers: { Authorization: `Bearer ${token}` } }
+                        );
+                        offerData = data;
+                    }
 
 
                         // Check if offer is already expired
