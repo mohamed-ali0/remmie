@@ -3,35 +3,12 @@ const Stripe = require('stripe');
 const { pool, dbPrefix } = require('../config/db');
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 const frontendBase = process.env.FRONTEND_URL;
-const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-// Track ongoing payment requests to prevent duplicates
-const ongoingRequests = new Set(); 
+const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET; 
 
 
 async function createFlightPaymentSession(req, res) {
-  const { booking_ref, passengers, contact, use_saved_payment_method } = req.body;
+  const { booking_ref,passengers,contact } = req.body;
   const userId = req.user.userId;
-  
-  console.log('🔍 Payment request details:');
-  console.log('   Booking ref:', booking_ref);
-  console.log('   User ID:', userId);
-  console.log('   Use saved payment method:', use_saved_payment_method);
-  console.log('   Request timestamp:', new Date().toISOString());
-  
-  // Check if request is already in progress
-  const requestKey = `${booking_ref}_${userId}`;
-  if (ongoingRequests.has(requestKey)) {
-    console.log('⚠️ Payment request already in progress for this booking');
-    return res.status(409).json({ 
-      message: 'Payment request already in progress. Please wait...',
-      status: 'in_progress'
-    });
-  }
-  
-  // Mark request as in progress
-  ongoingRequests.add(requestKey);
-  
   try {
 
     const guestDetails = {
@@ -159,9 +136,9 @@ async function createFlightPaymentSession(req, res) {
       }
     }
 
-    // 4. Check if user has saved payment method
-    if (paymentMethodId && use_saved_payment_method === true) {
-      // User explicitly chose to use saved payment method
+    // 4. Check saved payment method
+    if (paymentMethodId) {
+      // Direct charge using saved card
       const customer = await stripe.customers.retrieve(stripeCustomerId);
       const defaultPm = customer.invoice_settings.default_payment_method;
 
@@ -185,29 +162,10 @@ async function createFlightPaymentSession(req, res) {
         status: 'redirect',
         url: `${frontendBase}/booking-success?booking_ref=${booking_ref}&session_id=${paymentIntent.id}`
       });
-    } else if (paymentMethodId && use_saved_payment_method === false) {
-      // User explicitly chose NOT to use saved payment method - create new session
-      console.log('👤 User chose to use new payment method instead of saved one');
-      // Continue to create new checkout session below - will fall through to else block
-    } else if (paymentMethodId && use_saved_payment_method === undefined) {
-      // User has saved payment method but didn't specify preference - ask them
-      console.log('❓ User has saved payment method but no preference specified');
-      return res.json({
-        status: 'choose_payment_method',
-        has_saved_payment_method: true,
-        message: 'You have a saved payment method. Would you like to use it or enter a new payment method?',
-        options: {
-          use_saved: 'Use saved payment method',
-          use_new: 'Enter new payment method'
-        }
-      });
       
     } else {
       // ❌ No saved card → create checkout session
-      console.log('🆕 Creating new Stripe checkout session...');
-      try {
-        // Add timeout to prevent hanging
-        const sessionPromise = stripe.checkout.sessions.create({
+      const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         mode: 'payment',
         customer: stripeCustomerId,
@@ -230,37 +188,18 @@ async function createFlightPaymentSession(req, res) {
         },
         success_url: `${frontendBase}/booking-success?booking_ref=${booking_ref}&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${frontendBase}/bookingcart?booking_ref=${booking_ref}`
-        });
-        
-        // Add timeout to prevent hanging
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Stripe API timeout after 30 seconds')), 30000);
-        });
-        
-        const session = await Promise.race([sessionPromise, timeoutPromise]);
+      });
 
-        console.log('✅ Stripe session created successfully:', session.url);
-        return res.json({
-          status: 'redirect',
-          url: session.url,
-          message: 'Redirecting to Stripe Checkout to add a new card'
-        });
-      } catch (stripeError) {
-        console.error('❌ Stripe API Error:', stripeError);
-        return res.status(500).json({ 
-          message: 'Failed to create Stripe session', 
-          error: stripeError.message 
-        });
-      }
+      return res.json({
+        status: 'redirect',
+        url: session.url,
+        message: 'Redirecting to Stripe Checkout to add a new card'
+      });
     }
 
   } catch (err) {
     console.error('Stripe Payment Error:', err);
     return res.status(500).json({ message: 'Payment process failed' });
-  } finally {
-    // Clean up request tracking
-    ongoingRequests.delete(requestKey);
-    console.log('🧹 Cleaned up request tracking for:', requestKey);
   }
 }
 
