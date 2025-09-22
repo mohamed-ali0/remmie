@@ -782,93 +782,98 @@ const fullOffers = async (req, res) => {
           const departureOfferId = departureData.data.selected_offers[0];
           const returnOfferId = returnData.data.selected_offers[0];
           
-          console.log(`🔄 Processing round-trip session: departure=${departureOfferId}, return=${returnOfferId}`);
-          
-          // Try to fetch both offers from Duffel API, but handle expired offers
-          let departureResponse, returnResponse;
-          let usingStoredData = false;
-          
-          try {
-            // Fetch both offers from Duffel API
-            [departureResponse, returnResponse] = await Promise.all([
-              axios.get(`${duffel_api_url}/air/offers/${departureOfferId}`, {
-                headers: {
-                  'Accept-Encoding': 'gzip',
-                  'Accept': 'application/json',
-                  'Duffel-Version': 'v2',
-                  'Authorization': `Bearer ${duffel_access_tokens}`
-                }
-              }),
-              axios.get(`${duffel_api_url}/air/offers/${returnOfferId}`, {
-                headers: {
-                  'Accept-Encoding': 'gzip',
-                  'Accept': 'application/json',
-                  'Duffel-Version': 'v2',
-                  'Authorization': `Bearer ${duffel_access_tokens}`
-                }
-              })
-            ]);
-          } catch (duffelError) {
-            console.log('⚠️ Duffel offers expired or not found, using stored booking data');
-            usingStoredData = true;
-            
-            // Use stored flight_offers data from database
-            const [storedDeparture] = await pool.query(
-              `SELECT flight_offers FROM ${dbPrefix}bookings WHERE booking_reference = ?`,
-              [departureBooking.booking_reference]
-            );
-            
-            const [storedReturn] = await pool.query(
-              `SELECT flight_offers FROM ${dbPrefix}bookings WHERE booking_reference = ?`,
-              [returnBooking.booking_reference]
-            );
-            
-            if (storedDeparture[0]?.flight_offers && storedReturn[0]?.flight_offers) {
-              // Parse stored offers
-              const departureOffer = typeof storedDeparture[0].flight_offers === 'string' 
-                ? JSON.parse(storedDeparture[0].flight_offers) 
-                : storedDeparture[0].flight_offers;
-              
-              const returnOffer = typeof storedReturn[0].flight_offers === 'string'
-                ? JSON.parse(storedReturn[0].flight_offers)
-                : storedReturn[0].flight_offers;
-              
-              // Create mock responses with stored data
-              departureResponse = { data: departureOffer };
-              returnResponse = { data: returnOffer };
-            } else {
-              // If no stored data, throw error
-              throw new Error('Offers expired and no stored flight data available');
-            }
-          }
-          
-          // Handle both Duffel API response format and stored data format
-          const getDepartureData = () => departureResponse.data.data || departureResponse.data;
-          const getReturnData = () => returnResponse.data.data || returnResponse.data;
-          
-          const departureTotal = parseFloat(getDepartureData().total_amount);
-          const returnTotal = parseFloat(getReturnData().total_amount);
-          const combinedTotal = (departureTotal + returnTotal).toFixed(2);
+           console.log(`🔄 Processing round-trip session: departure=${departureOfferId}, return=${returnOfferId}`);
+           
+           // Try to fetch offers from Duffel, but fallback to stored data if expired
+           let departureData, returnData;
+           let usingStoredData = false;
+           
+           try {
+             // Attempt to fetch both offers from Duffel API
+             const [departureResponse, returnResponse] = await Promise.all([
+               axios.get(`${duffel_api_url}/air/offers/${departureOfferId}`, {
+                 headers: {
+                   'Accept-Encoding': 'gzip',
+                   'Accept': 'application/json',
+                   'Duffel-Version': 'v2',
+                   'Authorization': `Bearer ${duffel_access_tokens}`
+                 }
+               }),
+               axios.get(`${duffel_api_url}/air/offers/${returnOfferId}`, {
+                 headers: {
+                   'Accept-Encoding': 'gzip',
+                   'Accept': 'application/json',
+                   'Duffel-Version': 'v2',
+                   'Authorization': `Bearer ${duffel_access_tokens}`
+                 }
+               })
+             ]);
+             
+             departureData = departureResponse.data.data;
+             returnData = returnResponse.data.data;
+             console.log('✅ Using live Duffel offer data');
+           } catch (duffelError) {
+             console.log('⚠️ Duffel offers expired (404), using stored booking data instead');
+             usingStoredData = true;
+             
+             // Fetch stored flight data from database
+             const [storedBookings] = await pool.query(
+               `SELECT booking_reference, flight_offers, amount 
+                FROM ${dbPrefix}bookings 
+                WHERE round_trip_session_id = ?
+                ORDER BY created_at ASC`,
+               [bookingInfo[0].round_trip_session_id]
+             );
+             
+             if (storedBookings.length !== 2) {
+               throw new Error('Could not find both bookings in session');
+             }
+             
+             const depBooking = storedBookings.find(b => b.booking_reference === departureBooking.booking_reference);
+             const retBooking = storedBookings.find(b => b.booking_reference === returnBooking.booking_reference);
+             
+             if (!depBooking?.flight_offers || !retBooking?.flight_offers) {
+               throw new Error('No stored flight data available');
+             }
+             
+             // Parse stored flight offers
+             departureData = typeof depBooking.flight_offers === 'string' 
+               ? JSON.parse(depBooking.flight_offers).data 
+               : depBooking.flight_offers.data;
+               
+             returnData = typeof retBooking.flight_offers === 'string'
+               ? JSON.parse(retBooking.flight_offers).data
+               : retBooking.flight_offers.data;
+               
+             // Use stored amounts if available
+             if (depBooking.amount && retBooking.amount) {
+               departureData.total_amount = depBooking.amount;
+               returnData.total_amount = retBooking.amount;
+             }
+           }
+           
+           const departureTotal = parseFloat(departureData.total_amount);
+           const returnTotal = parseFloat(returnData.total_amount);
+           const combinedTotal = (departureTotal + returnTotal).toFixed(2);
           
           console.log(`🔢 Round-trip session pricing:`);
-          console.log(`   Data source: ${usingStoredData ? '📁 Stored booking data (offers expired)' : '✈️ Live Duffel API'}`);
+          console.log(`   Data source: ${usingStoredData ? '📁 Database (offers expired)' : '✅ Live Duffel'}`);
           console.log(`   Departure: ${departureTotal}`);
           console.log(`   Return: ${returnTotal}`);
           console.log(`   Combined: ${combinedTotal}`);
-          console.log(`   Departure slices: ${getDepartureData().slices?.length}`);
-          console.log(`   Return slices: ${getReturnData().slices?.length}`);
+          console.log(`   Departure slices: ${departureData.slices?.length}`);
+          console.log(`   Return slices: ${returnData.slices?.length}`);
           
-          // Handle expiry date - use stored data or set a reasonable default
+          // Handle expiry date - if offers expired, set a reasonable checkout window
           let expiresAt;
-          if (getDepartureData().expires_at && getReturnData().expires_at) {
+          if (departureData.expires_at && returnData.expires_at) {
             expiresAt = new Date(Math.min(
-              new Date(getDepartureData().expires_at).getTime(), 
-              new Date(getReturnData().expires_at).getTime()
+              new Date(departureData.expires_at).getTime(), 
+              new Date(returnData.expires_at).getTime()
             ));
           } else {
-            // If offers are expired, set expiry to 24 hours from now for checkout
+            // If using stored data (offers expired), set expiry to 24 hours from now
             expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-            console.log('📅 Using extended expiry for expired offers:', expiresAt.toISOString());
           }
           
           const combinedOffer = {
@@ -876,18 +881,21 @@ const fullOffers = async (req, res) => {
               id: `rt_session_${bookingInfo[0].round_trip_session_id}`,
               trip_type: 'round_trip_session',
               total_amount: combinedTotal,
-              total_currency: getDepartureData().total_currency,
-              base_amount: (parseFloat(getDepartureData().base_amount || 0) + 
-                           parseFloat(getReturnData().base_amount || 0)).toFixed(2),
-              tax_amount: (parseFloat(getDepartureData().tax_amount || 0) + 
-                          parseFloat(getReturnData().tax_amount || 0)).toFixed(2),
-              slices: [...(getDepartureData().slices || []), 
-                       ...(getReturnData().slices || [])],
-              passengers: getDepartureData().passengers,
-              conditions: getDepartureData().conditions || {},
+              total_currency: departureData.total_currency || 'USD',
+              base_amount: (
+                parseFloat(departureData.base_amount || 0) + 
+                parseFloat(returnData.base_amount || 0)
+              ).toFixed(2),
+              tax_amount: (
+                parseFloat(departureData.tax_amount || 0) + 
+                parseFloat(returnData.tax_amount || 0)
+              ).toFixed(2),
+              slices: [...(departureData.slices || []), ...(returnData.slices || [])],
+              passengers: departureData.passengers || [],
+              conditions: departureData.conditions || {},
               expires_at: expiresAt,
               round_trip_session_id: bookingInfo[0].round_trip_session_id,
-              payment_requirements: getDepartureData().payment_requirements || {
+              payment_requirements: departureData.payment_requirements || {
                 price_guarantee_expires_at: expiresAt.toISOString()
               }
             }
@@ -1350,6 +1358,35 @@ const saveOrderAmount = async (req, res) => {
 
         // ✅ 6. Success response
         console.log(`✅ Database updated successfully for booking ID: ${requestData.booking_id}`);
+        
+        // If this is a round-trip session, also update the companion booking with the same offer data
+        if (sessionCheck.length > 0) {
+            const sessionId = sessionCheck[0].round_trip_session_id;
+            const currentType = sessionCheck[0].round_trip_type;
+            
+            // Find the companion booking
+            const [companionRows] = await pool.query(
+                `SELECT id FROM ${dbPrefix}bookings 
+                 WHERE round_trip_session_id = ? AND round_trip_type != ? AND id != ?`,
+                [sessionId, currentType, requestData.booking_id]
+            );
+            
+            if (companionRows.length > 0) {
+                const companionBookingId = companionRows[0].id;
+                
+                // Update companion booking with the same offer data
+                await pool.query(
+                    `UPDATE ${dbPrefix}bookings
+                     SET 
+                         flight_offers = ?,
+                         updated_at = NOW()
+                     WHERE id = ?`,
+                    [JSON.stringify(requestData.flight_offers), companionBookingId]
+                );
+                console.log(`✅ Also updated companion booking ID: ${companionBookingId}`);
+            }
+        }
+        
         res.json({ success: true, message: 'Offer updated successfully' });
 
     } catch (err) {
