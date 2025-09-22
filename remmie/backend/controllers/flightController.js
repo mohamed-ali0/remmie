@@ -1690,21 +1690,78 @@ const createRoundTripReturn = async (req, res) => {
       return res.status(400).json({ message: 'Invalid or incomplete return booking data.' });
     }
     
-    const sessionId = requestData.data.round_trip_session_id;
-    if (!sessionId) {
-      return res.status(400).json({ message: 'round_trip_session_id is required for return booking.' });
+    let sessionId = requestData.data.round_trip_session_id;
+    
+    // 🔧 AUTO-LINKING: If session ID is empty/missing, try to find matching departure booking
+    if (!sessionId || sessionId === "" || sessionId === null) {
+      console.log('⚠️ Empty session ID detected - attempting auto-linking with departure booking');
+      
+      try {
+        // Get passenger details for matching
+        const firstPassenger = requestData.data.passengers[0];
+        const passengerEmail = firstPassenger?.email;
+        const passengerPhone = firstPassenger?.phone_number;
+        const passengerName = `${firstPassenger?.given_name} ${firstPassenger?.family_name}`;
+        
+        console.log(`🔍 Searching for departure booking with:`);
+        console.log(`   Email: ${passengerEmail}`);
+        console.log(`   Phone: ${passengerPhone}`);
+        console.log(`   Name: ${passengerName}`);
+        
+        // Find recent departure booking within 30 seconds by matching passenger details
+        const [matchingBookings] = await pool.query(`
+          SELECT round_trip_session_id, booking_reference, created_at, booking_json 
+          FROM ${dbPrefix}bookings 
+          WHERE round_trip_type = 'departure' 
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 30 SECOND)
+            AND (
+              booking_json LIKE ? OR 
+              booking_json LIKE ? OR 
+              booking_json LIKE ?
+            )
+          ORDER BY created_at DESC 
+          LIMIT 1
+        `, [
+          `%${passengerEmail}%`,
+          `%${passengerPhone}%`,
+          `%${passengerName}%`
+        ]);
+        
+        if (matchingBookings.length > 0) {
+          sessionId = matchingBookings[0].round_trip_session_id;
+          console.log(`✅ Auto-linked with departure booking: ${matchingBookings[0].booking_reference}`);
+          console.log(`   Session ID: ${sessionId}`);
+          console.log(`   Time since departure: ${Math.round((new Date() - new Date(matchingBookings[0].created_at)) / 1000)}s`);
+        } else {
+          console.log('❌ No matching departure booking found within 30-second window');
+          return res.status(400).json({ 
+            message: 'No matching departure booking found. Please provide round_trip_session_id or ensure departure booking was created within 30 seconds.',
+            auto_link_attempted: true,
+            search_criteria: { passengerEmail, passengerPhone, passengerName }
+          });
+        }
+      } catch (autoLinkError) {
+        console.error('Auto-linking error:', autoLinkError);
+        return res.status(400).json({ message: 'round_trip_session_id is required for return booking.' });
+      }
     }
     
     try {
-      // Check if departure booking exists
+      // Check if departure booking exists (now using potentially auto-linked session ID)
       const [departureBookings] = await pool.query(
         `SELECT * FROM ${dbPrefix}bookings WHERE round_trip_session_id = ? AND round_trip_type = 'departure' LIMIT 1`,
         [sessionId]
       );
       
       if (departureBookings.length === 0) {
-        return res.status(404).json({ message: 'Departure booking not found for this session.' });
+        return res.status(404).json({ 
+          message: 'Departure booking not found for this session.',
+          session_id_used: sessionId,
+          auto_link_attempted: !requestData.data.round_trip_session_id
+        });
       }
+      
+      console.log(`🔗 Successfully linked return booking with departure session: ${sessionId}`);
       
       const departureBooking = departureBookings[0];
       
