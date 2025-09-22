@@ -140,9 +140,11 @@ const BookingCart = () => {
                 // Step 2: Fetch offer details - handle round-trip vs one-way
                 if (bookingJson.data?.selected_offers?.length > 0) {
                     let offerData;
+                    let offerId = null; // Initialize offerId for both branches
                     
                     if (bookingData.is_round_trip && bookingData.companion_booking) {
                         console.log('🔄 Fetching round-trip offer details');
+                        offerId = 'round-trip-session'; // Set identifier for round-trip
                         
                         // For round-trip, we need to fetch offers using the round-trip session
                         // The fullOffers endpoint can handle this with booking_ref parameter
@@ -156,7 +158,7 @@ const BookingCart = () => {
                         console.log('✈️ Fetching one-way offer details');
                         
                         // For one-way, use the original logic
-                        const offerId = bookingJson.data.selected_offers[0];
+                        offerId = bookingJson.data.selected_offers[0];
                         const { data } = await axios.post(
                             `${import.meta.env.VITE_API_BASE_URL}/api/flight/full-offers?offer_id=${offerId}`,
                             {},
