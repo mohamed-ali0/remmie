@@ -1,0 +1,106 @@
+# N8N Round-Trip Booking Expressions
+
+## 🛫 Node 1: Create Departure Booking
+**Endpoint:** POST /api/flight/round-trip/departure
+
+**Expression:**
+```json
+{
+  "data": {
+    "selected_offers": [
+      "{{ $fromAI('departure_offer_id', 'The selected departure offer ID from Get Offer Details response', 'string') }}"
+    ],
+    "payments": [
+      {
+        "type": "balance",
+        "currency": "{{ $fromAI('departure_currency', 'Currency code from the departure offer details (e.g., GBP, USD)', 'string') }}",
+        "amount": "{{ $fromAI('departure_total_amount', 'Total amount from the departure offer details', 'string') }}"
+      }
+    ],
+    "passengers": {{ $fromAI('passengers_json', 'Complete passengers array as JSON string. Each passenger object must contain: id (from departure offer details), title, given_name, family_name, born_on (YYYY-MM-DD), phone_number (with country code), email. Example: [{"id":"pas_12345","title":"Mr","given_name":"John","family_name":"Doe","born_on":"1990-01-01","phone_number":"+92xxxxxxxxxx","email":"john@example.com"}]', 'string') }}
+  }
+}
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "round_trip_session_id": "rt_session_1234567_abc",
+  "departure_booking_ref": "BOOK-ABC123",
+  "message": "Departure flight booked successfully. Please book your return flight.",
+  "next_step": "book_return_flight",
+  "is_round_trip_complete": false
+}
+```
+
+## 🛬 Node 2: Create Return Booking  
+**Endpoint:** POST /api/flight/round-trip/return
+
+**Expression:**
+```json
+{
+  "data": {
+    "round_trip_session_id": "{{ $json.round_trip_session_id }}",
+    "selected_offers": [
+      "{{ $fromAI('return_offer_id', 'The selected return offer ID from Get Offer Details response', 'string') }}"
+    ],
+    "payments": [
+      {
+        "type": "balance",
+        "currency": "{{ $fromAI('return_currency', 'Currency code from the return offer details (e.g., GBP, USD)', 'string') }}",
+        "amount": "{{ $fromAI('return_total_amount', 'Total amount from the return offer details', 'string') }}"
+      }
+    ],
+    "passengers": {{ $fromAI('passengers_json', 'Complete passengers array as JSON string. MUST be the same as departure booking. Each passenger object must contain: id (from return offer details), title, given_name, family_name, born_on (YYYY-MM-DD), phone_number (with country code), email. Example: [{"id":"pas_67890","title":"Mr","given_name":"John","family_name":"Doe","born_on":"1990-01-01","phone_number":"+92xxxxxxxxxx","email":"john@example.com"}]', 'string') }}
+  }
+}
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "round_trip_complete": true,
+  "departure_booking_ref": "BOOK-ABC123",
+  "return_booking_ref": "BOOK-DEF456",
+  "checkout_url": "https://remmie.co/bookingcart?booking_ref=BOOK-ABC123",
+  "total_amount": "735.42",
+  "departure_amount": "367.71",
+  "return_amount": "367.71",
+  "currency": "USD",
+  "message": "Round-trip booking completed successfully! Proceed to checkout.",
+  "is_round_trip_complete": true
+}
+```
+
+## 🔄 N8N Workflow Flow:
+
+1. **Search Departure Flights** → User selects → **Call Node 1** → Get session_id
+2. **Search Return Flights** → User selects → **Call Node 2** (with session_id) → Get checkout URL
+3. **Present checkout URL** to user
+
+## 📝 Key Differences from Original:
+
+### **Node 1 (Departure):**
+- ✅ No session_id needed (backend creates it)
+- ✅ Uses `departure_offer_id`, `departure_currency`, `departure_total_amount`
+- ✅ Returns `round_trip_session_id` for next step
+
+### **Node 2 (Return):**  
+- ✅ MUST include `round_trip_session_id` from Node 1 response
+- ✅ Uses `return_offer_id`, `return_currency`, `return_total_amount`
+- ✅ Returns final `checkout_url` when complete
+
+## 🎯 AI Instructions (Ultra Simple):
+
+```markdown
+For Round-Trip Flights:
+
+1. Search departure flights → User selects → Call /api/flight/round-trip/departure
+2. Get session_id from response
+3. Search return flights → User selects → Call /api/flight/round-trip/return (with session_id)
+4. Present checkout_url from final response
+
+NEVER use the old /api/flight/create-order-link for round-trip flights.
+```

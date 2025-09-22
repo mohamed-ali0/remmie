@@ -1620,6 +1620,157 @@ const createConformOrder = async (req, res) => {
 };
 
 
+// NEW ROUND-TRIP SPECIFIC ENDPOINTS
+const createRoundTripDeparture = async (req, res) => {
+    console.log('🛫 ROUND-TRIP DEPARTURE BOOKING');
+    
+    const requestData = req.body;
+    if (!requestData || !requestData.data || !requestData.data.selected_offers || !requestData.data.passengers || !requestData.data.payments) {
+      return res.status(400).json({ message: 'Invalid or incomplete departure booking data.' });
+    }
+    
+    try {
+      // Generate unique booking reference and session ID
+      let bookingRef;
+      let isUnique = false;
+      while (!isUnique) {
+        bookingRef = `BOOK-${uuidv4().slice(0, 8).toUpperCase()}`;
+        const [existing] = await pool.query(
+          `SELECT 1 FROM ${dbPrefix}bookings WHERE booking_reference = ? LIMIT 1`,
+          [bookingRef]
+        );
+        isUnique = existing.length === 0;
+      }
+      
+      // Generate round-trip session ID
+      const sessionId = `rt_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      console.log(`📝 Creating departure booking:`);
+      console.log(`   Booking Reference: ${bookingRef}`);
+      console.log(`   Session ID: ${sessionId}`);
+      console.log(`   Offer ID: ${requestData.data.selected_offers[0]}`);
+      console.log(`   Amount: ${requestData.data.payments[0].amount}`);
+      
+      // Add session info to request data
+      requestData.data.round_trip_session_id = sessionId;
+      requestData.data.round_trip_type = 'departure';
+      
+      // Save departure booking
+      const [result] = await pool.query(
+        `INSERT INTO ${dbPrefix}bookings (booking_reference, booking_json, round_trip_session_id, round_trip_type, created_at)
+         VALUES (?, ?, ?, ?, NOW())`,
+        [bookingRef, JSON.stringify(requestData), sessionId, 'departure']
+      );
+      
+      console.log(`✅ Departure booking saved - waiting for return booking`);
+      
+      return res.status(201).json({
+        success: true,
+        round_trip_session_id: sessionId,
+        departure_booking_ref: bookingRef,
+        departure_booking_id: result.insertId,
+        message: 'Departure flight booked successfully. Please book your return flight.',
+        next_step: 'book_return_flight',
+        is_round_trip_complete: false
+      });
+      
+    } catch (err) {
+      console.error('Error creating departure booking:', err);
+      return res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
+
+const createRoundTripReturn = async (req, res) => {
+    console.log('🛬 ROUND-TRIP RETURN BOOKING');
+    
+    const requestData = req.body;
+    if (!requestData || !requestData.data || !requestData.data.selected_offers || !requestData.data.passengers || !requestData.data.payments) {
+      return res.status(400).json({ message: 'Invalid or incomplete return booking data.' });
+    }
+    
+    const sessionId = requestData.data.round_trip_session_id;
+    if (!sessionId) {
+      return res.status(400).json({ message: 'round_trip_session_id is required for return booking.' });
+    }
+    
+    try {
+      // Check if departure booking exists
+      const [departureBookings] = await pool.query(
+        `SELECT * FROM ${dbPrefix}bookings WHERE round_trip_session_id = ? AND round_trip_type = 'departure' LIMIT 1`,
+        [sessionId]
+      );
+      
+      if (departureBookings.length === 0) {
+        return res.status(404).json({ message: 'Departure booking not found for this session.' });
+      }
+      
+      const departureBooking = departureBookings[0];
+      
+      // Generate unique booking reference for return
+      let returnBookingRef;
+      let isUnique = false;
+      while (!isUnique) {
+        returnBookingRef = `BOOK-${uuidv4().slice(0, 8).toUpperCase()}`;
+        const [existing] = await pool.query(
+          `SELECT 1 FROM ${dbPrefix}bookings WHERE booking_reference = ? LIMIT 1`,
+          [returnBookingRef]
+        );
+        isUnique = existing.length === 0;
+      }
+      
+      console.log(`📝 Creating return booking:`);
+      console.log(`   Booking Reference: ${returnBookingRef}`);
+      console.log(`   Session ID: ${sessionId}`);
+      console.log(`   Departure Booking: ${departureBooking.booking_reference}`);
+      console.log(`   Offer ID: ${requestData.data.selected_offers[0]}`);
+      console.log(`   Amount: ${requestData.data.payments[0].amount}`);
+      
+      // Add session info to request data
+      requestData.data.round_trip_session_id = sessionId;
+      requestData.data.round_trip_type = 'return';
+      
+      // Save return booking
+      const [result] = await pool.query(
+        `INSERT INTO ${dbPrefix}bookings (booking_reference, booking_json, round_trip_session_id, round_trip_type, created_at)
+         VALUES (?, ?, ?, ?, NOW())`,
+        [returnBookingRef, JSON.stringify(requestData), sessionId, 'return']
+      );
+      
+      // Calculate total amount
+      const departureData = JSON.parse(departureBooking.booking_json);
+      const departureAmount = parseFloat(departureData.data.payments[0].amount);
+      const returnAmount = parseFloat(requestData.data.payments[0].amount);
+      const totalAmount = (departureAmount + returnAmount).toFixed(2);
+      
+      console.log(`✅ ROUND-TRIP COMPLETE!`);
+      console.log(`   Departure: ${departureBooking.booking_reference} ($${departureAmount})`);
+      console.log(`   Return: ${returnBookingRef} ($${returnAmount})`);
+      console.log(`   Total: $${totalAmount}`);
+      console.log(`   Checkout URL: ${booking_base_url}?booking_ref=${departureBooking.booking_reference}`);
+      
+      return res.status(201).json({
+        success: true,
+        round_trip_complete: true,
+        round_trip_session_id: sessionId,
+        departure_booking_ref: departureBooking.booking_reference,
+        return_booking_ref: returnBookingRef,
+        departure_booking_id: departureBooking.id,
+        return_booking_id: result.insertId,
+        checkout_url: `${booking_base_url}?booking_ref=${departureBooking.booking_reference}`,
+        total_amount: totalAmount,
+        departure_amount: departureAmount.toFixed(2),
+        return_amount: returnAmount.toFixed(2),
+        currency: requestData.data.payments[0].currency,
+        message: 'Round-trip booking completed successfully! Proceed to checkout.',
+        is_round_trip_complete: true
+      });
+      
+    } catch (err) {
+      console.error('Error creating return booking:', err);
+      return res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
+
 module.exports = {
   placesSuggestions,
   offerRequests,
@@ -1628,5 +1779,7 @@ module.exports = {
   fullOffers,
   createOrderLink,
   createConformOrder,
-  saveOrderAmount
+  saveOrderAmount,
+  createRoundTripDeparture,
+  createRoundTripReturn
 };
