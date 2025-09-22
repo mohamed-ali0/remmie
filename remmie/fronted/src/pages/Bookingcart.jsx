@@ -315,6 +315,12 @@ const BookingCart = () => {
     };
 
     const handlePayNow = async () => {
+        // Prevent multiple clicks
+        if (paying) {
+            console.log('Payment already in progress, ignoring click');
+            return;
+        }
+
         if (!validatePassengerData()) {
             const firstErrorElement = document.querySelector('.is-invalid');
             if (firstErrorElement) {
@@ -328,6 +334,7 @@ const BookingCart = () => {
 
         try {
             setPaying(true);
+            console.log('🚀 Starting payment process...');
 
             // પહેલા formData.passengers માંથી basic passenger data તૈયાર કરો
             const rawPassengers = formData.passengers.map((passenger, index) => ({
@@ -431,7 +438,15 @@ const BookingCart = () => {
             }
         } catch (e) {
             console.error('Payment error', e);
-            alert('Payment initiation failed. ' + (e.response?.data?.message || ''));
+            
+            // Handle specific error cases
+            if (e.response?.status === 409) {
+                alert('Payment request is already in progress. Please wait...');
+            } else if (e.response?.status === 504) {
+                alert('Payment request timed out. Please try again.');
+            } else {
+                alert('Payment initiation failed. ' + (e.response?.data?.message || ''));
+            }
         } finally {
             setPaying(false);
         }
