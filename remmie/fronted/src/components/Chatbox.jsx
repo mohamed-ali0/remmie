@@ -60,7 +60,7 @@ export default function Chatbox() {
             console.log('Loading chat history for user:', userId);
             
             // Load chat history from backend bookings-chat API
-            const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/bookings-chat/find-user-message`, {
+            const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/bookings-chat/find-user-message`, {
                 userId: userId
             }, {
                 headers: { Authorization: `Bearer ${getToken()}` }
@@ -114,7 +114,7 @@ export default function Chatbox() {
 
         try {
             // Step 1: Store USER message to backend
-            await axios.post(`${import.meta.env.VITE_API_URL}/api/bookings-chat/store-message`, {
+            await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/bookings-chat/store-message`, {
                 sessionId: sessionId,
                 message: inputMessage,
                 sender: 'user',
@@ -125,12 +125,12 @@ export default function Chatbox() {
             let userContext = {};
             try {
                 // Get user profile from backend API
-                const userProfileResponse = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/user-info`, {}, {
+                const userProfileResponse = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/auth/user-info`, {}, {
                     headers: { Authorization: `Bearer ${getToken()}` }
                 });
 
                 // Get chat history
-                const chatHistoryResponse = await axios.post(`${import.meta.env.VITE_API_URL}/api/bookings-chat/find-user-message`, {
+                const chatHistoryResponse = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/bookings-chat/find-user-message`, {
                     userId: userId
                 }, {
                     headers: { Authorization: `Bearer ${getToken()}` }
@@ -217,7 +217,7 @@ export default function Chatbox() {
             setMessages(prev => [...prev, botMsg]);
             
             // Step 4: Store BOT reply to backend
-            await axios.post(`${import.meta.env.VITE_API_URL}/api/bookings-chat/store-message`, {
+            await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/bookings-chat/store-message`, {
                 sessionId: sessionId,
                 message: botMsg.text,
                 sender: 'bot',
@@ -229,7 +229,7 @@ export default function Chatbox() {
             setMessages(prev => [...prev, errorMsg]);
 
             // Step 4: Also log error message to backend
-            await axios.post(`${import.meta.env.VITE_API_URL}/api/bookings-chat/store-message`, {
+            await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/bookings-chat/store-message`, {
                 sessionId: sessionId,
                 message: errorMsg.text,
                 sender: 'bot',

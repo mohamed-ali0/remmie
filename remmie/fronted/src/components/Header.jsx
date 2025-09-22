@@ -42,7 +42,7 @@ export default function Header() {
 
     try {
       if (token) {
-        await fetch(`${import.meta.env.VITE_API_URL}/api/auth/signout`, {
+        await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/auth/signout`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,

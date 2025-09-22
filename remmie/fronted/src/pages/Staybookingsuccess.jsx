@@ -39,7 +39,7 @@ export default function Staybookingsuccess() {
       try {
         // Step 1: Confirm payment
         const { data } = await axios.post(
-          `${import.meta.env.VITE_API_URL}/api/stripe/confirm-stay-Payment`,
+          `${import.meta.env.VITE_API_BASE_URL}/api/stripe/confirm-stay-Payment`,
           { booking_ref: bookingRef, session_id: sessionId },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -50,7 +50,7 @@ export default function Staybookingsuccess() {
           // Step 2: Save card if needed
           if (sessionId.startsWith('cs_')) {
             await axios.post(
-              `${import.meta.env.VITE_API_URL}/api/stripe/save-card-after-success`,
+              `${import.meta.env.VITE_API_BASE_URL}/api/stripe/save-card-after-success`,
               { session_id: sessionId },
               { headers: { Authorization: `Bearer ${token}` } }
             );

@@ -55,17 +55,17 @@ export default function Signup() {
   const onSubmit = async (data) => {
     try {
       // ✅ Step: Check email exists
-      // const checkRes = await axios.post('${import.meta.env.VITE_API_URL}/api/auth/check-email', { email: data.email });
+      // const checkRes = await axios.post('${import.meta.env.VITE_API_BASE_URL}/api/auth/check-email', { email: data.email });
       // if (checkRes.data.exists) {
       //   setServerError('Email already registered');
       //   return;
       // }
 
       // ✅ Step: Proceed with signup
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/signup`, data);
+      const res = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/auth/signup`, data);
       if (res.data.message == "User registered successfully") {
         // Proceed to login the user automatically
-        const loginRes = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/signin`, {
+        const loginRes = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/auth/signin`, {
           email: data.email,
           password: data.password,
         });

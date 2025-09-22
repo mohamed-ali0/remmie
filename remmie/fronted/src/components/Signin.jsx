@@ -54,7 +54,7 @@ export default function Signin() {
   // console.log(from);
   const onSubmit = async (data) => {
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/signin`, data);
+      const res = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/auth/signin`, data);
       localStorage.setItem('token', res.data.token); // Save token
       localStorage.setItem('user_profile', res.data.user_profile);
       localStorage.setItem('first_name', res.data.first_name);
@@ -70,7 +70,7 @@ export default function Signin() {
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
       const token = credentialResponse.credential; // Google ID token
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/signin-google`, { token });
+      const res = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/auth/signin-google`, { token });
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user_profile',res.data.user_profile);
       localStorage.setItem('first_name', res.data.first_name);
