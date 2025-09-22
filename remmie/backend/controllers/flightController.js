@@ -776,11 +776,11 @@ const fullOffers = async (req, res) => {
           const departureBooking = sessionBookings.find(b => b.round_trip_type === 'departure');
           const returnBooking = sessionBookings.find(b => b.round_trip_type === 'return');
           
-          const departureData = JSON.parse(departureBooking.booking_json);
-          const returnData = JSON.parse(returnBooking.booking_json);
+          const departureBookingData = JSON.parse(departureBooking.booking_json);
+          const returnBookingData = JSON.parse(returnBooking.booking_json);
           
-          const departureOfferId = departureData.data.selected_offers[0];
-          const returnOfferId = returnData.data.selected_offers[0];
+          const departureOfferId = departureBookingData.data.selected_offers[0];
+          const returnOfferId = returnBookingData.data.selected_offers[0];
           
            console.log(`🔄 Processing round-trip session: departure=${departureOfferId}, return=${returnOfferId}`);
            
