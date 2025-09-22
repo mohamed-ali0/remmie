@@ -96,7 +96,24 @@ export default function BookingSuccess() {
             { headers: { 'Content-Type': 'application/json' } }
           );
 
-          setOrderData(orderResponse.data.data); // Store the order data
+          // Handle both one-way and round-trip responses
+          const responseData = orderResponse.data.data;
+          
+          // For round-trip bookings, combine slices from both bookings
+          if (responseData.is_round_trip && responseData.return_booking) {
+            const combinedData = {
+              ...responseData,
+              slices: [
+                ...(responseData.slices || []),
+                ...(responseData.return_booking.slices || [])
+              ],
+              passengers: responseData.passengers || responseData.return_booking.passengers || []
+            };
+            setOrderData(combinedData);
+          } else {
+            setOrderData(responseData);
+          }
+          
           setStatus('Flight booking confirmed!');
         } else {
           setStatus('Payment could not be confirmed. Please contact support.');
@@ -182,7 +199,7 @@ export default function BookingSuccess() {
 
             {/* Flight Details */}
             <div className="flight-details mb-5 space-pt-50 space-pb-50">
-              {orderData.slices.map((slice, index) => (
+              {orderData?.slices?.map((slice, index) => (
                 <div className="flight-booking mb-5" key={index}>
                   <div className="flight-title text-center py-3">
                     <p><strong>{index === 0 ? 'Departure' : 'Return'}</strong></p>
@@ -202,7 +219,7 @@ export default function BookingSuccess() {
                         </p>
                       </div>
 
-                      {slice.segments.map((segment, segIndex) => (
+                      {slice?.segments?.map((segment, segIndex) => (
                         <div key={segIndex}>
                           <div className="list-details-contact">
                             <div className="list-contact">
@@ -264,7 +281,7 @@ export default function BookingSuccess() {
 
               <div className="flight-accordion mt-5">
                 <Accordion defaultActiveKey="0" flush>
-                  {orderData.passengers.map((passenger, index) => (
+                  {orderData?.passengers?.map((passenger, index) => (
                     <Accordion.Item
                       eventKey={index.toString()}
                       key={passenger.id}
@@ -309,7 +326,7 @@ export default function BookingSuccess() {
                             <div className="list-data">
                               <p className="list-title"><strong>BAGGAGE:</strong></p>
                               <p className="list-text"><span>
-                                {orderData.slices[0].segments[0].passengers[index].baggages.map(bag => (
+                                {orderData?.slices?.[0]?.segments?.[0]?.passengers?.[index]?.baggages?.map(bag => (
                                   `${bag.quantity} ${bag.type.replace('_', ' ')}`
                                 )).join(', ')}
                               </span></p>
