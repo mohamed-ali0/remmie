@@ -41,7 +41,7 @@
 ```json
 {
   "data": {
-    "round_trip_session_id": "{{ $json.round_trip_session_id }}",
+    "round_trip_session_id": "{{ $fromAI('round_trip_session_id', 'The session ID from departure booking (if AI provides it)', 'string') || '' }}",
     "selected_offers": [
       "{{ $fromAI('return_offer_id', 'The selected return offer ID from Get Offer Details response', 'string') }}"
     ],
@@ -56,6 +56,47 @@
   }
 }
 ```
+
+**🔧 Session ID Logic (Simplified):**
+Let AI handle session ID management or use backend auto-linking:
+1. `$fromAI('round_trip_session_id', '...', 'string')` - **IF AI provides session ID**
+2. `''` - **OR empty string** (triggers backend auto-linking within 30 seconds)
+
+**📊 N8N Workflow Structure:**
+```
+AI Node
+├── Create_depart_booking (departure)
+└── Create_return_booking (return) ← needs to reference departure node directly
+```
+
+**🔄 Parallel Node Access:**
+- Both nodes connect to AI, not to each other
+- Return node must use `$('Create_depart_booking')` to access departure node's output
+- This is **direct node reference**, not execution flow
+
+**🛡️ Backend Auto-Linking:**
+If all session ID attempts fail (empty string sent), the backend will:
+- Search for departure booking within 30 seconds
+- Match by passenger email, phone, and name
+- Auto-link the return booking to the found departure
+
+**📝 Alternative Session ID Expressions (Simplified):**
+Choose the approach that works best:
+```javascript
+// Option 1: Let AI provide session ID (RECOMMENDED)
+"{{ $fromAI('round_trip_session_id', 'Session ID from departure booking', 'string') || '' }}"
+
+// Option 2: Always use backend auto-linking (SIMPLEST)
+""
+
+// Option 3: Direct node reference (if needed)
+"{{ $('Create_depart_booking').first().json.round_trip_session_id || '' }}"
+```
+
+**🎯 Simplified Approach:**
+- **AI can provide session ID**: If AI remembers/stores the session ID from departure
+- **OR backend auto-links**: Using passenger details + 30-second time window
+- **No complex node references needed**: Keep it simple and let backend handle linking
 
 **Expected Response:**
 ```json

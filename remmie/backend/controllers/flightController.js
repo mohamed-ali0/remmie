@@ -989,6 +989,8 @@ const fullOffers = async (req, res) => {
 // };
 
 const createOrderLink = async (req, res) => {
+    console.log('🛫 ONE-WAY FLIGHT BOOKING (create-order-link)');
+    
     const requestData = req.body;
     if (!requestData || !requestData.data || !requestData.data.selected_offers || !requestData.data.passengers || !requestData.data.payments) {
       return res.status(400).json({ message: 'Invalid or incomplete flight booking data.' });
@@ -996,138 +998,38 @@ const createOrderLink = async (req, res) => {
     
     let selectedOfferId = requestData.data.selected_offers[0];
     let isRoundTrip = selectedOfferId && selectedOfferId.startsWith('rt_');
-    let roundTripSessionId = requestData.data.round_trip_session_id;
-    let roundTripType = requestData.data.round_trip_type;
-    let isRoundTripBooking = roundTripSessionId && roundTripType;
     
-    // HANDLE OLD N8N: If N8N sends combined rt_ ID, split it and create 2 bookings
-    if (isRoundTrip && !roundTripSessionId) {
-      console.log(`⚠️  Old N8N system detected - combined rt_ offer without session ID`);
-      console.log(`   Will split into 2 separate bookings with auto-generated session`);
-      
-      // Generate session ID for this round-trip
-      roundTripSessionId = `rt_n8n_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      // Split the combined ID correctly
-      const withoutPrefix = selectedOfferId.replace('rt_', '');
-      const secondOffIndex = withoutPrefix.indexOf('_off_');
-      
-      if (secondOffIndex > 0) {
-        const departureOfferId = withoutPrefix.substring(0, secondOffIndex);
-        const returnOfferId = withoutPrefix.substring(secondOffIndex + 1);
-        
-        console.log(`   Split IDs: departure=${departureOfferId}, return=${returnOfferId}`);
-        
-        // Modify request to use departure offer ID and add session info
-        requestData.data.selected_offers[0] = departureOfferId;
-        requestData.data.round_trip_session_id = roundTripSessionId;
-        requestData.data.round_trip_type = 'departure';
-        roundTripType = 'departure';
-        isRoundTripBooking = true;
-        
-        // We'll need to create the return booking separately
-        // Store return info for later processing
-        requestData._return_offer_id = returnOfferId;
-        requestData._needs_return_booking = true;
-        
-        // If N8N sent total amount, split it between the two bookings
-        const totalAmount = parseFloat(requestData.data.payments?.[0]?.amount || 0);
-        if (totalAmount > 500) {
-          console.log(`   N8N sent total amount: ${totalAmount}, will split between bookings`);
-          requestData.data.payments[0].amount = (totalAmount / 2).toFixed(2);
-          requestData._return_amount = (totalAmount / 2).toFixed(2);
-        }
-      }
+    // 🚨 BLOCK ROUND-TRIP REQUESTS - Use dedicated endpoints instead
+    if (isRoundTrip || requestData.data.round_trip_session_id || requestData.data.round_trip_type) {
+      console.log('❌ Round-trip booking detected in create-order-link endpoint');
+      console.log('   Please use dedicated endpoints:');
+      console.log('   - POST /api/flight/round-trip/departure');
+      console.log('   - POST /api/flight/round-trip/return');
+      return res.status(400).json({ 
+        message: 'Round-trip bookings must use dedicated endpoints. Use /api/flight/round-trip/departure and /api/flight/round-trip/return instead.',
+        round_trip_detected: true,
+        correct_endpoints: [
+          'POST /api/flight/round-trip/departure',
+          'POST /api/flight/round-trip/return'
+        ]
+      });
     }
     
-    // TIME-WINDOW AUTO-LINKING: Link bookings within 1 minute window
-    const TIME_WINDOW_SECONDS = 60; // 1 minute window for round-trip bookings
-    const needsAutoLinking = !isRoundTrip && !roundTripSessionId;
+    console.log(`   One-way offer ID: ${selectedOfferId}`);
     
-    if (needsAutoLinking) {
-      const userEmail = requestData.data.passengers[0]?.email;
-      if (userEmail) {
-        console.log(`🕐 TIME-WINDOW AUTO-LINKING: Checking for bookings within ${TIME_WINDOW_SECONDS} seconds`);
-        
-        // Look for bookings by the same user within the time window
-        const timeWindowStart = new Date(Date.now() - TIME_WINDOW_SECONDS * 1000);
-        const [recentBookings] = await pool.query(
-          `SELECT * FROM ${dbPrefix}bookings 
-           WHERE JSON_EXTRACT(booking_json, '$.data.passengers[0].email') = ? 
-           AND created_at >= ? 
-           AND round_trip_session_id IS NULL
-           AND JSON_EXTRACT(booking_json, '$.data.selected_offers[0]') NOT LIKE 'rt_%'
-           ORDER BY created_at DESC LIMIT 1`,
-          [userEmail, timeWindowStart.toISOString().slice(0, 19).replace('T', ' ')]
-        );
-        
-        console.log(`   Found ${recentBookings.length} booking(s) within ${TIME_WINDOW_SECONDS}s window`);
-        
-        if (recentBookings.length === 1) {
-          const firstBooking = recentBookings[0];
-          const firstBookingData = JSON.parse(firstBooking.booking_json);
-          
-          // Check if bookings are for opposite directions (departure vs return)
-          const firstSlice = firstBookingData.data.slices?.[0] || {};
-          const currentSlice = requestData.data.slices?.[0] || {};
-          
-          // Auto-link if origins and destinations are swapped (indicating return flight)
-          const isReturnFlight = (
-            firstSlice.origin === currentSlice.destination && 
-            firstSlice.destination === currentSlice.origin
-          ) || (
-            // Or just link any 2 bookings within time window for same user
-            true // Simplified: any 2 bookings within 1 minute are considered round-trip
-          );
-          
-          if (isReturnFlight) {
-            // Generate auto-session ID
-            const autoSessionId = `rt_auto_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            
-            console.log(`🔗 AUTO-LINKING ROUND-TRIP (Time Window):`);
-            console.log(`   First booking: ${firstBooking.booking_reference} (created ${Math.round((Date.now() - new Date(firstBooking.created_at).getTime()) / 1000)}s ago)`);
-            console.log(`   Current booking: will be linked as return`);
-            console.log(`   Session ID: ${autoSessionId}`);
-            
-            // Update the first booking as departure
-            await pool.query(
-              `UPDATE ${dbPrefix}bookings 
-               SET round_trip_session_id = ?, round_trip_type = 'departure' 
-               WHERE id = ?`,
-              [autoSessionId, firstBooking.id]
-            );
-            
-            // Set current booking as return
-            requestData.data.round_trip_session_id = autoSessionId;
-            requestData.data.round_trip_type = 'return';
-            roundTripSessionId = autoSessionId;
-            roundTripType = 'return';
-            isRoundTripBooking = true;
-            
-            console.log(`✅ Successfully linked bookings with session: ${autoSessionId}`);
-          }
-        } else if (recentBookings.length === 0) {
-          console.log(`   This appears to be the first booking (departure) - will wait for return`);
-        }
-      }
-    }
+    // This endpoint now handles ONE-WAY flights only
+    // Round-trip flights should use dedicated endpoints
     
-    console.log(`📝 Creating booking order link:`);
+    // This endpoint is for ONE-WAY flights only - no auto-linking needed
+    
+    // Removed auto-linking logic - this endpoint is for ONE-WAY flights only
+    
+    console.log(`📝 Creating ONE-WAY booking order link:`);
     console.log(`   Selected offer ID: ${selectedOfferId}`);
-    console.log(`   Is round-trip: ${isRoundTrip}`);
-    console.log(`   Round-trip session ID: ${roundTripSessionId}`);
-    console.log(`   Round-trip type: ${roundTripType}`);
-    console.log(`   Is round-trip booking: ${isRoundTripBooking}`);
     console.log(`   Passengers: ${requestData.data.passengers.length}`);
     
-    // 🔍 Smart N8N Total Amount Detection
-    const n8nAmount = parseFloat(requestData.data.payments?.[0]?.amount || 0);
-    console.log(`💰 N8N provided amount: ${n8nAmount}`);
-    
-    // Check if this might be a round-trip total amount being sent to individual booking
-    if (n8nAmount > 500 && !isRoundTrip && (roundTripSessionId || needsAutoLinking)) {
-        console.log(`🔍 Possible N8N round-trip total detected: ${n8nAmount} (individual booking but high amount)`);
-    }
+    const amount = parseFloat(requestData.data.payments?.[0]?.amount || 0);
+    console.log(`💰 Booking amount: ${amount}`);
     
     console.log(`   Request data:`, JSON.stringify(requestData, null, 2));
     
