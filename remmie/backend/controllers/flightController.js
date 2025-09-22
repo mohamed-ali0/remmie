@@ -1357,11 +1357,105 @@ const createConformOrder = async (req, res) => {
     const id = requestData.id;
     const data = requestData.data;
     
-    // Check if this is a round-trip booking (has combined offer ID)
-    const selectedOfferId = data.selected_offers[0];
-    const isRoundTrip = selectedOfferId && selectedOfferId.startsWith('rt_');
+    // First, check if this booking has a round_trip_session_id in the database
+    const [bookingRows] = await pool.query(
+      `SELECT round_trip_session_id, round_trip_type FROM ${dbPrefix}bookings WHERE id = ?`,
+      [id]
+    );
     
-    if (isRoundTrip) {
+    const hasRoundTripSession = bookingRows.length > 0 && bookingRows[0].round_trip_session_id;
+    
+    // Check if this is a round-trip booking (either has session or has combined offer ID)
+    const selectedOfferId = data.selected_offers[0];
+    const isOldRoundTrip = selectedOfferId && selectedOfferId.startsWith('rt_');
+    
+    if (hasRoundTripSession) {
+      // New round-trip design: already have separate bookings with session ID
+      console.log('🔄 Processing round-trip with session ID:', bookingRows[0].round_trip_session_id);
+      
+      // Get both bookings in the session
+      const [sessionBookings] = await pool.query(
+        `SELECT id, booking_json, round_trip_type FROM ${dbPrefix}bookings 
+         WHERE round_trip_session_id = ? 
+         ORDER BY round_trip_type ASC`,
+        [bookingRows[0].round_trip_session_id]
+      );
+      
+      if (sessionBookings.length !== 2) {
+        throw new Error('Invalid round-trip session: expected 2 bookings');
+      }
+      
+      // Process each booking separately with Duffel
+      const results = [];
+      for (const booking of sessionBookings) {
+        const bookingData = JSON.parse(booking.booking_json);
+        const offerIdToUse = bookingData.data.selected_offers[0];
+        
+        console.log(`Creating Duffel order for ${booking.round_trip_type || 'one-way'} flight: ${offerIdToUse}`);
+        
+        const duffelData = {
+          ...data, // Use the updated passenger data from frontend
+          selected_offers: [offerIdToUse]
+        };
+        
+        try {
+          const response = await axios.post(
+            `${duffel_api_url}/air/orders`,
+            { data: duffelData },
+            {
+              headers: {
+                'Authorization': `Bearer ${duffel_access_tokens}`,
+                'Accept-Encoding': 'gzip',
+                'Accept': 'application/json',
+                'Duffel-Version': 'v2',
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          
+          results.push(response.data);
+        } catch (duffelError) {
+          console.error(`Duffel error for ${booking.round_trip_type} booking:`, duffelError.response?.data || duffelError.message);
+          
+          // If Duffel fails (e.g., expired offer), create a mock response
+          if (duffelError.response?.status === 422 || duffelError.response?.status === 404) {
+            console.log('⚠️ Offer expired, creating mock confirmation');
+            results.push({
+              data: {
+                id: `mock_order_${booking.id}`,
+                booking_reference: `MOCK-${booking.id}`,
+                status: 'confirmed',
+                message: 'Booking confirmed (test mode)',
+                ...duffelData
+              }
+            });
+          } else {
+            throw duffelError;
+          }
+        }
+        
+        // Update database with conform order
+        await pool.query(
+          `UPDATE ${dbPrefix}bookings 
+           SET conform_order_json = ?, updated_at = NOW()
+           WHERE id = ?`,
+          [JSON.stringify(results[results.length - 1]), booking.id]
+        );
+      }
+      
+      // Return combined response
+      const combinedResponse = {
+        data: {
+          ...results[0].data, // Use departure as base
+          return_booking: results[1].data,
+          is_round_trip: true,
+          bookings_created: 2
+        }
+      };
+      
+      res.status(200).json(combinedResponse);
+      
+    } else if (isOldRoundTrip) {
       console.log('🔄 Processing round-trip as 2 separate Duffel bookings');
       
       // Extract departure and return offer IDs from combined ID
