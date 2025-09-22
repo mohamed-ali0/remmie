@@ -53,11 +53,34 @@ async function createFlightPaymentSession(req, res) {
       );
       
       if (sessionBookings.length === 2) {
-        totalAmount = sessionBookings.reduce((sum, b) => sum + parseFloat(b.amount), 0);
-        console.log(`   Departure + Return: ${sessionBookings.map(b => `$${b.amount}`).join(' + ')} = $${totalAmount}`);
+        // Check if any booking has null amount (happens when saveOrderAmount wasn't called for return booking)
+        const hasNullAmount = sessionBookings.some(b => b.amount === null || b.amount === undefined);
+        
+        if (hasNullAmount) {
+          console.log(`⚠️ Some bookings have null amounts, using combined total from departure booking`);
+          // Use the amount from the departure booking (which should contain the total)
+          const departureBooking = sessionBookings.find(b => parseFloat(b.amount) > 0);
+          if (departureBooking) {
+            totalAmount = parseFloat(departureBooking.amount);
+            console.log(`   Using departure booking amount as total: $${totalAmount}`);
+          }
+        } else {
+          totalAmount = sessionBookings.reduce((sum, b) => sum + parseFloat(b.amount || 0), 0);
+          console.log(`   Departure + Return: ${sessionBookings.map(b => `$${b.amount || 0}`).join(' + ')} = $${totalAmount}`);
+        }
       }
     }
 
+    // Safety check for NaN
+    if (isNaN(totalAmount) || totalAmount <= 0) {
+      console.error(`❌ Invalid total amount: ${totalAmount}`);
+      return res.status(400).json({ 
+        message: 'Invalid payment amount. Please contact support.',
+        error: 'INVALID_AMOUNT',
+        totalAmount: totalAmount
+      });
+    }
+    
     const unitAmount = Math.round(totalAmount * 100);
     
     console.log(`💳 Creating flight payment session:`);
