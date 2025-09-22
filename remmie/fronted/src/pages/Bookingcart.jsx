@@ -383,11 +383,52 @@ const BookingCart = () => {
                     booking_ref: bookingRef,
                     contact: formData.contact,
                     passengers: passengersData,
+                    use_saved_payment_method: false // Default to new payment method
                 },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            window.location.href = data.url;
+            // Handle different response types
+            if (data.status === 'choose_payment_method') {
+                // Ask user to choose payment method
+                const choice = window.confirm(
+                    `${data.message}\n\nClick OK to use saved payment method, or Cancel to enter a new one.`
+                );
+                
+                if (choice) {
+                    // User chose to use saved payment method
+                    const { data: savedData } = await axios.post(
+                        `${import.meta.env.VITE_API_BASE_URL}/api/stripe/create-flight-payment-session`,
+                        {
+                            booking_ref: bookingRef,
+                            contact: formData.contact,
+                            passengers: passengersData,
+                            use_saved_payment_method: true
+                        },
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                    window.location.href = savedData.url;
+                } else {
+                    // User chose to use new payment method - create new session
+                    const { data: newData } = await axios.post(
+                        `${import.meta.env.VITE_API_BASE_URL}/api/stripe/create-flight-payment-session`,
+                        {
+                            booking_ref: bookingRef,
+                            contact: formData.contact,
+                            passengers: passengersData,
+                            use_saved_payment_method: false
+                        },
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                    window.location.href = newData.url;
+                }
+            } else if (data.url) {
+                // Normal redirect to Stripe
+                window.location.href = data.url;
+            } else {
+                console.error('Unexpected payment response:', data);
+                alert('Payment initiation failed. Please try again.');
+            }
         } catch (e) {
             console.error('Payment error', e);
             alert('Payment initiation failed. ' + (e.response?.data?.message || ''));
