@@ -9,6 +9,12 @@ const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 async function createFlightPaymentSession(req, res) {
   const { booking_ref, passengers, contact, use_saved_payment_method } = req.body;
   const userId = req.user.userId;
+  
+  console.log('🔍 Payment request details:');
+  console.log('   Booking ref:', booking_ref);
+  console.log('   User ID:', userId);
+  console.log('   Use saved payment method:', use_saved_payment_method);
+  
   try {
 
     const guestDetails = {
@@ -158,6 +164,7 @@ async function createFlightPaymentSession(req, res) {
         }
       });
 
+      console.log('✅ Using saved payment method, redirecting to:', `${frontendBase}/booking-success?booking_ref=${booking_ref}&session_id=${paymentIntent.id}`);
       return res.json({
         status: 'redirect',
         url: `${frontendBase}/booking-success?booking_ref=${booking_ref}&session_id=${paymentIntent.id}`
@@ -169,6 +176,7 @@ async function createFlightPaymentSession(req, res) {
     } else if (paymentMethodId && use_saved_payment_method === undefined) {
       // User has saved payment method but didn't specify preference - ask them
       console.log('❓ User has saved payment method but no preference specified');
+      console.log('❓ Returning choose_payment_method response');
       return res.json({
         status: 'choose_payment_method',
         has_saved_payment_method: true,
@@ -206,6 +214,7 @@ async function createFlightPaymentSession(req, res) {
         cancel_url: `${frontendBase}/bookingcart?booking_ref=${booking_ref}`
       });
 
+      console.log('✅ Creating new Stripe session:', session.url);
       return res.json({
         status: 'redirect',
         url: session.url,

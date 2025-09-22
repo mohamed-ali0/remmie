@@ -377,8 +377,12 @@ const BookingCart = () => {
             });
 
             // Send data to backend
+            const apiUrl = import.meta.env.VITE_API_URL || 'https://remmie.co';
+            console.log('API URL:', apiUrl);
+            console.log('Full URL:', `${apiUrl}/api/stripe/create-flight-payment-session`);
+            
             const { data } = await axios.post(
-                `${import.meta.env.VITE_API_URL}/api/stripe/create-flight-payment-session`,
+                `${apiUrl}/api/stripe/create-flight-payment-session`,
                 {
                     booking_ref: bookingRef,
                     contact: formData.contact,
@@ -391,6 +395,30 @@ const BookingCart = () => {
             // Handle different response types
             console.log('Payment response:', data);
             
+            // TEMPORARY FIX: Always use new payment method for testing
+            if (data.status === 'choose_payment_method') {
+                console.log('🔧 TEMPORARY: Bypassing payment method choice, using new payment method');
+                // Automatically choose new payment method
+                const { data: newData } = await axios.post(
+                    `${apiUrl}/api/stripe/create-flight-payment-session`,
+                    {
+                        booking_ref: bookingRef,
+                        contact: formData.contact,
+                        passengers: passengersData,
+                        use_saved_payment_method: false
+                    },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+                console.log('New payment response:', newData);
+                if (newData.url) {
+                    window.location.href = newData.url;
+                } else {
+                    console.error('No URL in new payment response:', newData);
+                    alert('Payment processing failed. Please try again.');
+                }
+                return;
+            }
+            
             if (data.status === 'choose_payment_method') {
                 // Ask user to choose payment method
                 const choice = window.confirm(
@@ -401,7 +429,7 @@ const BookingCart = () => {
                     // User chose to use saved payment method
                     console.log('User chose to use saved payment method');
                     const { data: savedData } = await axios.post(
-                        `${import.meta.env.VITE_API_URL}/api/stripe/create-flight-payment-session`,
+                        `${apiUrl}/api/stripe/create-flight-payment-session`,
                         {
                             booking_ref: bookingRef,
                             contact: formData.contact,
@@ -421,7 +449,7 @@ const BookingCart = () => {
                     // User chose to use new payment method - create new session
                     console.log('User chose to use new payment method');
                     const { data: newData } = await axios.post(
-                        `${import.meta.env.VITE_API_URL}/api/stripe/create-flight-payment-session`,
+                        `${apiUrl}/api/stripe/create-flight-payment-session`,
                         {
                             booking_ref: bookingRef,
                             contact: formData.contact,
