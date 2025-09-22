@@ -812,6 +812,8 @@ const fullOffers = async (req, res) => {
           console.log(`   Departure: ${departureTotal}`);
           console.log(`   Return: ${returnTotal}`);
           console.log(`   Combined: ${combinedTotal}`);
+          console.log(`   Departure slices: ${departureResponse.data.data.slices?.length}`);
+          console.log(`   Return slices: ${returnResponse.data.data.slices?.length}`);
           
           const combinedOffer = {
             data: {
@@ -825,9 +827,12 @@ const fullOffers = async (req, res) => {
               passengers: departureResponse.data.data.passengers,
               conditions: departureResponse.data.data.conditions,
               expires_at: new Date(Math.min(new Date(departureResponse.data.data.expires_at).getTime(), new Date(returnResponse.data.data.expires_at).getTime())),
-              round_trip_session_id: bookingInfo[0].round_trip_session_id
+              round_trip_session_id: bookingInfo[0].round_trip_session_id,
+              payment_requirements: departureResponse.data.data.payment_requirements
             }
           };
+          
+          console.log(`✅ Returning combined round-trip offer with ${combinedOffer.data.slices.length} slices`);
           
           return res.status(200).json(combinedOffer);
         }
@@ -1224,6 +1229,8 @@ const saveOrderAmount = async (req, res) => {
         );
         
         let finalAmount = requestData.total_amount;
+        let shouldUpdateCompanion = false;
+        let companionBookingId = null;
         
         if (sessionCheck.length > 0) {
             const sessionId = sessionCheck[0].round_trip_session_id;

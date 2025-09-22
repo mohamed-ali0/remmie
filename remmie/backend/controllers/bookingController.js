@@ -96,16 +96,43 @@ const getBookingByRef = async (req, res) => {
       console.log(`🔍 Round-trip detected: ${booking.round_trip_session_id}`);
       
       // Find the other booking in the same round-trip session
-      const [companionRows] = await pool.query(
+      // First try with user_id, then without (for bookings created via N8N/WhatsApp)
+      let companionRows;
+      
+      [companionRows] = await pool.query(
         `SELECT * FROM ${dbPrefix}bookings 
          WHERE round_trip_session_id = ? AND id != ? AND user_id = ?
          LIMIT 1`,
         [booking.round_trip_session_id, booking.id, userId]
       );
       
+      // If not found with user_id, try without it (and then assign the user_id)
+      if (companionRows.length === 0) {
+        [companionRows] = await pool.query(
+          `SELECT * FROM ${dbPrefix}bookings 
+           WHERE round_trip_session_id = ? AND id != ?
+           LIMIT 1`,
+          [booking.round_trip_session_id, booking.id]
+        );
+        
+        // If found, assign it to the current user
+        if (companionRows.length > 0 && !companionRows[0].user_id) {
+          await pool.query(
+            `UPDATE ${dbPrefix}bookings 
+             SET user_id = ? 
+             WHERE id = ?`,
+            [userId, companionRows[0].id]
+          );
+          companionRows[0].user_id = userId;
+          console.log(`📝 Assigned companion booking to user: ${companionRows[0].booking_reference}`);
+        }
+      }
+      
       if (companionRows.length > 0) {
         companionBooking = companionRows[0];
         console.log(`✅ Found companion booking: ${companionBooking.booking_reference} (${companionBooking.round_trip_type})`);
+      } else {
+        console.log(`⚠️ No companion booking found for session: ${booking.round_trip_session_id}`);
       }
     }
 

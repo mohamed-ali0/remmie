@@ -144,6 +144,7 @@ const BookingCart = () => {
                     
                     if (bookingData.is_round_trip && bookingData.companion_booking) {
                         console.log('🔄 Fetching round-trip offer details');
+                        console.log('   Companion booking:', bookingData.companion_booking);
                         offerId = 'round-trip-session'; // Set identifier for round-trip
                         
                         // For round-trip, we need to fetch offers using the round-trip session
@@ -153,6 +154,7 @@ const BookingCart = () => {
                             {},
                             { headers: { Authorization: `Bearer ${token}` } }
                         );
+                        console.log('📦 Round-trip offer response:', data);
                         offerData = data;
                     } else {
                         console.log('✈️ Fetching one-way offer details');
@@ -181,6 +183,8 @@ const BookingCart = () => {
                         console.log('   Tax amount:', offerData?.data.tax_amount);
                         console.log('   Total amount:', offerData?.data.total_amount);
                         console.log('   Currency:', offerData?.data.total_currency);
+                        console.log('   Number of slices:', offerData?.data?.slices?.length);
+                        console.log('   Has return slice:', offerData?.data?.slices?.[1]?.segments?.length > 0);
                         
                         // Send to backend
                        await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/flight/save-order-amount`, {
@@ -424,6 +428,12 @@ const BookingCart = () => {
     const returnSlice = slices[1] || {};
     const firstSegment = firstSlice.segments?.[0] || {};
     const returnSegment = returnSlice.segments?.[0] || {};
+    
+    // Debug round-trip data
+    console.log('🎯 Frontend display data:');
+    console.log('   Has return slice:', !!returnSlice.segments);
+    console.log('   Return segments length:', returnSlice.segments?.length);
+    console.log('   Trip type from data:', bookingData.trip_type);
     
     const passengerCounts = getPassengerTypeCount(passengers);
     const totalPassengers = passengerCounts.adult + passengerCounts.child + passengerCounts.infant;
