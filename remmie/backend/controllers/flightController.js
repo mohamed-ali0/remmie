@@ -1121,137 +1121,31 @@ const createOrderLink = async (req, res) => {
         isUnique = existing.length === 0;
       }
 
-      // Save booking with round-trip session info if applicable
-      let insertQuery, insertValues;
-      
-      if (isRoundTripBooking) {
-        insertQuery = `INSERT INTO ${dbPrefix}bookings (booking_reference, booking_json, round_trip_session_id, round_trip_type, created_at)
-                       VALUES (?, ?, ?, ?, NOW())`;
-        insertValues = [bookingRef, JSON.stringify(requestData), roundTripSessionId, roundTripType];
-        
-        console.log(`🔗 Saving round-trip booking part:`);
-        console.log(`   Session ID: ${roundTripSessionId}`);
-        console.log(`   Type: ${roundTripType}`);
-      } else {
-        insertQuery = `INSERT INTO ${dbPrefix}bookings (booking_reference, booking_json, created_at)
-                       VALUES (?, ?, NOW())`;
-        insertValues = [bookingRef, JSON.stringify(requestData)];
-      }
+      // Save one-way booking
+      const insertQuery = `INSERT INTO ${dbPrefix}bookings (booking_reference, booking_json, created_at)
+                           VALUES (?, ?, NOW())`;
+      const insertValues = [bookingRef, JSON.stringify(requestData)];
       
       const [result] = await pool.query(insertQuery, insertValues);
       
-      // If this was a split rt_ booking, create the return booking now
-      if (requestData._needs_return_booking && requestData._return_offer_id) {
-        console.log(`🔄 Creating automatic return booking for split rt_ ID`);
-        
-        // Create return booking data
-        const returnBookingData = JSON.parse(JSON.stringify(requestData));
-        returnBookingData.data.selected_offers[0] = requestData._return_offer_id;
-        returnBookingData.data.round_trip_type = 'return';
-        
-        // Use the return amount if it was split
-        if (requestData._return_amount) {
-          returnBookingData.data.payments[0].amount = requestData._return_amount;
-        }
-        
-        delete returnBookingData._needs_return_booking;
-        delete returnBookingData._return_offer_id;
-        delete returnBookingData._return_amount;
-        
-        // Generate return booking reference
-        let returnBookingRef;
-        let isUniqueReturn = false;
-        while (!isUniqueReturn) {
-          returnBookingRef = `BOOK-${uuidv4().slice(0, 8).toUpperCase()}`;
-          const [existingReturn] = await pool.query(
-            `SELECT 1 FROM ${dbPrefix}bookings WHERE booking_reference = ? LIMIT 1`,
-            [returnBookingRef]
-          );
-          isUniqueReturn = existingReturn.length === 0;
-        }
-        
-        // Save return booking
-        await pool.query(
-          `INSERT INTO ${dbPrefix}bookings (booking_reference, booking_json, round_trip_session_id, round_trip_type, created_at)
-           VALUES (?, ?, ?, ?, NOW())`,
-          [returnBookingRef, JSON.stringify(returnBookingData), roundTripSessionId, 'return']
-        );
-        
-        console.log(`✅ Auto-created return booking: ${returnBookingRef}`);
-        
-        // Return the departure booking reference for checkout (it will handle both)
-        return res.status(201).json({
-          success: true,
-          message: 'Round-trip booking completed successfully (auto-split)',
-          booking_reference: bookingRef,
-          booking_id: result.insertId,
-          booking_url: `${booking_base_url}?booking_ref=${bookingRef}`,
-          round_trip_session_id: roundTripSessionId,
-          is_round_trip_complete: true
-        });
-      }
+      console.log(`✅ One-way booking saved: ${bookingRef}`);
       
-      // For round-trip bookings, check if this completes the pair
-      if (isRoundTripBooking) {
-        const [sessionBookings] = await pool.query(
-          `SELECT booking_reference, round_trip_type FROM ${dbPrefix}bookings 
-           WHERE round_trip_session_id = ? ORDER BY created_at ASC`,
-          [roundTripSessionId]
-        );
-        
-        console.log(`🔍 Round-trip session bookings found: ${sessionBookings.length}`);
-        
-        if (sessionBookings.length === 2) {
-          // Both departure and return bookings are complete
-          const departureBooking = sessionBookings.find(b => b.round_trip_type === 'departure');
-          const returnBooking = sessionBookings.find(b => b.round_trip_type === 'return');
-          
-          console.log(`✅ ROUND-TRIP COMPLETE!`);
-          console.log(`   Departure: ${departureBooking.booking_reference}`);
-          console.log(`   Return: ${returnBooking.booking_reference}`);
-          console.log(`   Checkout URL: ${booking_base_url}?booking_ref=${departureBooking.booking_reference}`);
-          
-          // Return the departure booking reference for checkout (it will handle both)
-          return res.status(201).json({
-            success: true,
-            message: 'Round-trip booking completed successfully',
-            booking_reference: departureBooking.booking_reference,
-            return_booking_reference: returnBooking.booking_reference,
-            booking_id: result.insertId,
-            booking_url: `${booking_base_url}?booking_ref=${departureBooking.booking_reference}`,
-            round_trip_session_id: roundTripSessionId,
-            is_round_trip_complete: true,
-            checkout_message: "Both flights booked! Proceed to payment for your complete round-trip."
-          });
-        } else {
-          // Only one part of round-trip is complete - don't show payment link yet
-          console.log(`⏳ Round-trip partial (${roundTripType} completed) - waiting for second booking`);
-          
-          return res.status(201).json({
-            success: true,
-            message: `Round-trip ${roundTripType} booking saved, processing ${roundTripType === 'departure' ? 'return' : 'departure'} flight...`,
-            booking_reference: bookingRef,
-            booking_id: result.insertId,
-            round_trip_session_id: roundTripSessionId,
-            is_round_trip_complete: false,
-            // Don't include booking_url yet - wait for both bookings
-            waiting_message: "First flight saved. Please wait while we process your return flight..."
-          });
-        }
-      } else {
-        // Regular one-way booking
-        return res.status(201).json({
-          success: true,
-          message: 'Booking saved successfully',
-          booking_reference: bookingRef,
-          booking_id: result.insertId,
-          booking_url: `${booking_base_url}?booking_ref=${bookingRef}`
-        });
-      }
-  } catch (err) {
-    console.error('Error saving booking:', err);
-    return res.status(500).json({ message: 'Server error',error:err });
-  }
+      // Generate booking URL
+      const bookingUrl = `${booking_base_url}?booking_ref=${bookingRef}`;
+      
+      console.log(`🔗 Booking URL generated: ${bookingUrl}`);
+      
+      res.status(201).json({
+        success: true,
+        booking_reference: bookingRef,
+        booking_url: bookingUrl,
+        message: 'One-way flight booking created successfully'
+      });
+    } catch (err) {
+      console.error('Error saving booking:', err);
+      return res.status(500).json({ message: 'Server error', error: err });
+    }
+  };
 
 };
 
