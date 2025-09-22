@@ -784,51 +784,112 @@ const fullOffers = async (req, res) => {
           
           console.log(`🔄 Processing round-trip session: departure=${departureOfferId}, return=${returnOfferId}`);
           
-          // Fetch both offers from Duffel API
-          const [departureResponse, returnResponse] = await Promise.all([
-            axios.get(`${duffel_api_url}/air/offers/${departureOfferId}`, {
-              headers: {
-                'Accept-Encoding': 'gzip',
-                'Accept': 'application/json',
-                'Duffel-Version': 'v2',
-                'Authorization': `Bearer ${duffel_access_tokens}`
-              }
-            }),
-            axios.get(`${duffel_api_url}/air/offers/${returnOfferId}`, {
-              headers: {
-                'Accept-Encoding': 'gzip',
-                'Accept': 'application/json',
-                'Duffel-Version': 'v2',
-                'Authorization': `Bearer ${duffel_access_tokens}`
-              }
-            })
-          ]);
+          // Try to fetch both offers from Duffel API, but handle expired offers
+          let departureResponse, returnResponse;
+          let usingStoredData = false;
           
-          const departureTotal = parseFloat(departureResponse.data.data.total_amount);
-          const returnTotal = parseFloat(returnResponse.data.data.total_amount);
+          try {
+            // Fetch both offers from Duffel API
+            [departureResponse, returnResponse] = await Promise.all([
+              axios.get(`${duffel_api_url}/air/offers/${departureOfferId}`, {
+                headers: {
+                  'Accept-Encoding': 'gzip',
+                  'Accept': 'application/json',
+                  'Duffel-Version': 'v2',
+                  'Authorization': `Bearer ${duffel_access_tokens}`
+                }
+              }),
+              axios.get(`${duffel_api_url}/air/offers/${returnOfferId}`, {
+                headers: {
+                  'Accept-Encoding': 'gzip',
+                  'Accept': 'application/json',
+                  'Duffel-Version': 'v2',
+                  'Authorization': `Bearer ${duffel_access_tokens}`
+                }
+              })
+            ]);
+          } catch (duffelError) {
+            console.log('⚠️ Duffel offers expired or not found, using stored booking data');
+            usingStoredData = true;
+            
+            // Use stored flight_offers data from database
+            const [storedDeparture] = await pool.query(
+              `SELECT flight_offers FROM ${dbPrefix}bookings WHERE booking_reference = ?`,
+              [departureBooking.booking_reference]
+            );
+            
+            const [storedReturn] = await pool.query(
+              `SELECT flight_offers FROM ${dbPrefix}bookings WHERE booking_reference = ?`,
+              [returnBooking.booking_reference]
+            );
+            
+            if (storedDeparture[0]?.flight_offers && storedReturn[0]?.flight_offers) {
+              // Parse stored offers
+              const departureOffer = typeof storedDeparture[0].flight_offers === 'string' 
+                ? JSON.parse(storedDeparture[0].flight_offers) 
+                : storedDeparture[0].flight_offers;
+              
+              const returnOffer = typeof storedReturn[0].flight_offers === 'string'
+                ? JSON.parse(storedReturn[0].flight_offers)
+                : storedReturn[0].flight_offers;
+              
+              // Create mock responses with stored data
+              departureResponse = { data: departureOffer };
+              returnResponse = { data: returnOffer };
+            } else {
+              // If no stored data, throw error
+              throw new Error('Offers expired and no stored flight data available');
+            }
+          }
+          
+          // Handle both Duffel API response format and stored data format
+          const getDepartureData = () => departureResponse.data.data || departureResponse.data;
+          const getReturnData = () => returnResponse.data.data || returnResponse.data;
+          
+          const departureTotal = parseFloat(getDepartureData().total_amount);
+          const returnTotal = parseFloat(getReturnData().total_amount);
           const combinedTotal = (departureTotal + returnTotal).toFixed(2);
           
           console.log(`🔢 Round-trip session pricing:`);
+          console.log(`   Data source: ${usingStoredData ? '📁 Stored booking data (offers expired)' : '✈️ Live Duffel API'}`);
           console.log(`   Departure: ${departureTotal}`);
           console.log(`   Return: ${returnTotal}`);
           console.log(`   Combined: ${combinedTotal}`);
-          console.log(`   Departure slices: ${departureResponse.data.data.slices?.length}`);
-          console.log(`   Return slices: ${returnResponse.data.data.slices?.length}`);
+          console.log(`   Departure slices: ${getDepartureData().slices?.length}`);
+          console.log(`   Return slices: ${getReturnData().slices?.length}`);
+          
+          // Handle expiry date - use stored data or set a reasonable default
+          let expiresAt;
+          if (getDepartureData().expires_at && getReturnData().expires_at) {
+            expiresAt = new Date(Math.min(
+              new Date(getDepartureData().expires_at).getTime(), 
+              new Date(getReturnData().expires_at).getTime()
+            ));
+          } else {
+            // If offers are expired, set expiry to 24 hours from now for checkout
+            expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+            console.log('📅 Using extended expiry for expired offers:', expiresAt.toISOString());
+          }
           
           const combinedOffer = {
             data: {
               id: `rt_session_${bookingInfo[0].round_trip_session_id}`,
               trip_type: 'round_trip_session',
               total_amount: combinedTotal,
-              total_currency: departureResponse.data.data.total_currency,
-              base_amount: (parseFloat(departureResponse.data.data.base_amount) + parseFloat(returnResponse.data.data.base_amount)).toFixed(2),
-              tax_amount: (parseFloat(departureResponse.data.data.tax_amount) + parseFloat(returnResponse.data.data.tax_amount)).toFixed(2),
-              slices: [...departureResponse.data.data.slices, ...returnResponse.data.data.slices],
-              passengers: departureResponse.data.data.passengers,
-              conditions: departureResponse.data.data.conditions,
-              expires_at: new Date(Math.min(new Date(departureResponse.data.data.expires_at).getTime(), new Date(returnResponse.data.data.expires_at).getTime())),
+              total_currency: getDepartureData().total_currency,
+              base_amount: (parseFloat(getDepartureData().base_amount || 0) + 
+                           parseFloat(getReturnData().base_amount || 0)).toFixed(2),
+              tax_amount: (parseFloat(getDepartureData().tax_amount || 0) + 
+                          parseFloat(getReturnData().tax_amount || 0)).toFixed(2),
+              slices: [...(getDepartureData().slices || []), 
+                       ...(getReturnData().slices || [])],
+              passengers: getDepartureData().passengers,
+              conditions: getDepartureData().conditions || {},
+              expires_at: expiresAt,
               round_trip_session_id: bookingInfo[0].round_trip_session_id,
-              payment_requirements: departureResponse.data.data.payment_requirements
+              payment_requirements: getDepartureData().payment_requirements || {
+                price_guarantee_expires_at: expiresAt.toISOString()
+              }
             }
           };
           
