@@ -900,6 +900,311 @@ async function PaymentTest(req, res) {
       return res.json({ success: true, message: customer,message2: defaultPm });
 
   }
+
+// Test endpoints for complete booking flow simulation
+async function testOneWayBooking(req, res) {
+  try {
+    const userId = req.user.userId;
+    
+    // Mock flight data (one-way)
+    const mockFlightData = {
+      quote_id: `quote_${Date.now()}`,
+      passengers: [
+        {
+          id: "passenger_1",
+          type: "adult",
+          title: "Mr",
+          given_name: "John",
+          family_name: "Doe",
+          born_on: "1990-01-15",
+          phone_number: "+1234567890",
+          email: "john.doe@example.com",
+          gender: "m"
+        }
+      ],
+      slices: [
+        {
+          origin: {
+            iata_code: "LAX",
+            name: "Los Angeles International Airport"
+          },
+          destination: {
+            iata_code: "JFK", 
+            name: "John F. Kennedy International Airport"
+          },
+          departure_date: "2025-02-15",
+          arrival_date: "2025-02-15",
+          segments: [
+            {
+              origin: {
+                iata_code: "LAX",
+                name: "Los Angeles International Airport"
+              },
+              destination: {
+                iata_code: "JFK",
+                name: "John F. Kennedy International Airport"
+              },
+              departing_at: "2025-02-15T08:00:00",
+              arriving_at: "2025-02-15T16:30:00",
+              duration: "PT8H30M",
+              operating_carrier: {
+                iata_code: "AA",
+                name: "American Airlines",
+                logo_symbol_url: "https://example.com/aa-logo.png"
+              },
+              operating_carrier_flight_number: "1234",
+              aircraft: {
+                name: "Boeing 737"
+              },
+              distance: 2475,
+              passengers: [
+                {
+                  cabin_class_marketing_name: "Economy",
+                  baggages: [
+                    {
+                      quantity: 1,
+                      type: "carry_on"
+                    },
+                    {
+                      quantity: 1,
+                      type: "checked_bag"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      base_amount: 450.00,
+      tax_amount: 89.50,
+      total_amount: 539.50,
+      currency: "USD",
+      booking_reference: `TEST_OW_${Date.now()}`
+    };
+
+    // Create Stripe checkout session
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'One-Way Flight Booking Test',
+              description: `LAX to JFK - ${mockFlightData.passengers[0].given_name} ${mockFlightData.passengers[0].family_name}`,
+            },
+            unit_amount: Math.round(mockFlightData.total_amount * 100), // Convert to cents
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: `${frontendBase}/booking-success?booking_ref=${mockFlightData.booking_reference}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${frontendBase}/flight`,
+      metadata: {
+        booking_ref: mockFlightData.booking_reference,
+        user_id: userId.toString(),
+        test_type: 'one_way'
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Test one-way booking created successfully',
+      booking_reference: mockFlightData.booking_reference,
+      payment_url: session.url,
+      mock_data: mockFlightData
+    });
+
+  } catch (error) {
+    console.error('Test one-way booking error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to create test one-way booking',
+      error: error.message 
+    });
+  }
+}
+
+async function testRoundTripBooking(req, res) {
+  try {
+    const userId = req.user.userId;
+    
+    // Mock flight data (round-trip)
+    const mockFlightData = {
+      quote_id: `quote_${Date.now()}`,
+      passengers: [
+        {
+          id: "passenger_1",
+          type: "adult",
+          title: "Ms",
+          given_name: "Jane",
+          family_name: "Smith",
+          born_on: "1985-05-20",
+          phone_number: "+1987654321",
+          email: "jane.smith@example.com",
+          gender: "f"
+        }
+      ],
+      slices: [
+        {
+          origin: {
+            iata_code: "NYC",
+            name: "New York City"
+          },
+          destination: {
+            iata_code: "LAX",
+            name: "Los Angeles International Airport"
+          },
+          departure_date: "2025-03-10",
+          arrival_date: "2025-03-10",
+          segments: [
+            {
+              origin: {
+                iata_code: "JFK",
+                name: "John F. Kennedy International Airport"
+              },
+              destination: {
+                iata_code: "LAX",
+                name: "Los Angeles International Airport"
+              },
+              departing_at: "2025-03-10T10:30:00",
+              arriving_at: "2025-03-10T13:45:00",
+              duration: "PT6H15M",
+              operating_carrier: {
+                iata_code: "DL",
+                name: "Delta Air Lines",
+                logo_symbol_url: "https://example.com/delta-logo.png"
+              },
+              operating_carrier_flight_number: "5678",
+              aircraft: {
+                name: "Airbus A320"
+              },
+              distance: 2475,
+              passengers: [
+                {
+                  cabin_class_marketing_name: "Economy",
+                  baggages: [
+                    {
+                      quantity: 1,
+                      type: "carry_on"
+                    },
+                    {
+                      quantity: 2,
+                      type: "checked_bag"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          origin: {
+            iata_code: "LAX",
+            name: "Los Angeles International Airport"
+          },
+          destination: {
+            iata_code: "NYC",
+            name: "New York City"
+          },
+          departure_date: "2025-03-17",
+          arrival_date: "2025-03-17",
+          segments: [
+            {
+              origin: {
+                iata_code: "LAX",
+                name: "Los Angeles International Airport"
+              },
+              destination: {
+                iata_code: "JFK",
+                name: "John F. Kennedy International Airport"
+              },
+              departing_at: "2025-03-17T14:20:00",
+              arriving_at: "2025-03-17T22:35:00",
+              duration: "PT5H15M",
+              operating_carrier: {
+                iata_code: "UA",
+                name: "United Airlines",
+                logo_symbol_url: "https://example.com/united-logo.png"
+              },
+              operating_carrier_flight_number: "9012",
+              aircraft: {
+                name: "Boeing 787"
+              },
+              distance: 2475,
+              passengers: [
+                {
+                  cabin_class_marketing_name: "Economy",
+                  baggages: [
+                    {
+                      quantity: 1,
+                      type: "carry_on"
+                    },
+                    {
+                      quantity: 2,
+                      type: "checked_bag"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      base_amount: 720.00,
+      tax_amount: 145.80,
+      total_amount: 865.80,
+      currency: "USD",
+      booking_reference: `TEST_RT_${Date.now()}`,
+      is_round_trip: true
+    };
+
+    // Create Stripe checkout session
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Round-Trip Flight Booking Test',
+              description: `JFK ↔ LAX - ${mockFlightData.passengers[0].given_name} ${mockFlightData.passengers[0].family_name}`,
+            },
+            unit_amount: Math.round(mockFlightData.total_amount * 100), // Convert to cents
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: `${frontendBase}/booking-success?booking_ref=${mockFlightData.booking_reference}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${frontendBase}/flight`,
+      metadata: {
+        booking_ref: mockFlightData.booking_reference,
+        user_id: userId.toString(),
+        test_type: 'round_trip'
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Test round-trip booking created successfully',
+      booking_reference: mockFlightData.booking_reference,
+      payment_url: session.url,
+      mock_data: mockFlightData
+    });
+
+  } catch (error) {
+    console.error('Test round-trip booking error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to create test round-trip booking',
+      error: error.message 
+    });
+  }
+}
+
 module.exports = {
   createFlightPaymentSession, 
   confirmPayment, 
@@ -910,5 +1215,7 @@ module.exports = {
   userPaymentMethodsAdd,
   userPaymentMethodsSetDefault,
   userPaymentMethodsDelete,
-  PaymentTest
+  PaymentTest,
+  testOneWayBooking,
+  testRoundTripBooking
 };

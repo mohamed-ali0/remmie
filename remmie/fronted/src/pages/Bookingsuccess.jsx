@@ -176,13 +176,13 @@ export default function BookingSuccess() {
           <>
             <div className="booking-basis mb-5">
               <div className="basis-ticket-contact">
-                <h4>Thanks {orderData.passengers[0]?.given_name} {orderData.passengers[0]?.family_name} for choosing Basis!</h4>
+                <h4>Thanks {orderData?.passengers?.[0]?.given_name} {orderData?.passengers?.[0]?.family_name} for choosing Basis!</h4>
                 {/*<div className="basis-ticket">
                   <strong className="basis-id"><IconTicket /> Basis Ticket Id:</strong>
                   <Link className='basis-code'>BS{Math.floor(1000 + Math.random() * 9000)}</Link>
                 </div>*/}
               </div>
-              <p className="basis-test">A confirmation email will be sent to <strong>{orderData.passengers[0]?.email}</strong>. This may take up to 30 minutes.</p>
+              <p className="basis-test">A confirmation email will be sent to <strong>{orderData?.passengers?.[0]?.email}</strong>. This may take up to 30 minutes.</p>
             </div>
 
             <div className="booling-grid mb-5">
@@ -212,10 +212,10 @@ export default function BookingSuccess() {
                   <div className="flight-list p-4">
                     <div className="list-details">
                       <div className="list-contact-title">
-                        <h4 className="text_primary">{formatDate(slice.segments[0].departing_at)}</h4>
+                        <h4 className="text_primary">{formatDate(slice?.segments?.[0]?.departing_at)}</h4>
                         <p>
                           <span>Record Locator:</span>
-                          <span>{orderData.booking_reference}</span>
+                          <span>{orderData?.booking_reference}</span>
                         </p>
                       </div>
 
@@ -353,19 +353,19 @@ export default function BookingSuccess() {
                       <tr>
                         <td>
                           <p className="text_primary"><strong>FARE</strong></p>
-                          <p>Passenger x {orderData.passengers.length}</p>
+                          <p>Passenger x {orderData?.passengers?.length || 1}</p>
                         </td>
                         <td align="end">
-                          <p><strong>${orderData.base_amount}</strong></p>
+                          <p><strong>${orderData?.base_amount || 0}</strong></p>
                         </td>
                       </tr>
                       <tr>
                         <td>
                           <p className="text_primary"><strong>TAXES AND FEES</strong></p>
-                          <p>Passenger x {orderData.passengers.length}</p>
+                          <p>Passenger x {orderData?.passengers?.length || 1}</p>
                         </td>
                         <td align="end">
-                          <p><strong>${orderData.tax_amount}</strong></p>
+                          <p><strong>${orderData?.tax_amount || 0}</strong></p>
                         </td>
                       </tr>
                       <tr>
@@ -373,7 +373,7 @@ export default function BookingSuccess() {
                           <p className="text_primary"><strong className="text_primary">Total</strong></p>
                         </td>
                         <td align="end">
-                          <p className="text_primary"><strong className="text_primary">${orderData.total_amount}</strong></p>
+                          <p className="text_primary"><strong className="text_primary">${orderData?.total_amount || 0}</strong></p>
                         </td>
                       </tr>
                     </tbody>
@@ -391,13 +391,13 @@ export default function BookingSuccess() {
                   the security of air travel. Certain changes in airport procedures and restrictions on items
                   allowed on board aircraft are detailed on the <Link to="" className="text_primary">Travel Alert: Elevated Security</Link> page.
                 </p>
-                {orderData.conditions.refund_before_departure.allowed && (
+                {orderData?.conditions?.refund_before_departure?.allowed && (
                   <p className="policies-text mt-3">
-                    <strong>Refund Policy:</strong> Refunds are allowed before departure with a penalty of {orderData.conditions.refund_before_departure.penalty_amount} {orderData.conditions.refund_before_departure.penalty_currency}.
+                    <strong>Refund Policy:</strong> Refunds are allowed before departure with a penalty of {orderData?.conditions?.refund_before_departure?.penalty_amount || 0} {orderData?.conditions?.refund_before_departure?.penalty_currency || 'USD'}.
                   </p>
                 )}
                 <p className="policies-text mt-3">
-                  <strong>Changes Policy:</strong> Changes are {orderData.conditions.change_before_departure.allowed ? 'allowed' : 'not allowed'} before departure.
+                  <strong>Changes Policy:</strong> Changes are {orderData?.conditions?.change_before_departure?.allowed ? 'allowed' : 'not allowed'} before departure.
                 </p>
               </div>
             </div>

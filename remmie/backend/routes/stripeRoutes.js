@@ -9,7 +9,9 @@ const { createFlightPaymentSession,
 		userPaymentMethodsAdd,
 		userPaymentMethodsSetDefault,
 		userPaymentMethodsDelete,
-		PaymentTest
+		PaymentTest,
+		testOneWayBooking,
+		testRoundTripBooking
 	} = require('../controllers/stripeController');
 const { authenticate } = require('../middleware/authMiddleware');
 
@@ -27,5 +29,9 @@ router.post('/user-payment-methods-setdefault', authenticate, userPaymentMethods
 router.post('/user-payment-methods-add', authenticate, userPaymentMethodsAdd);
 router.post('/user-payment-methods-delete', authenticate, userPaymentMethodsDelete);
 router.post('/payment-test',PaymentTest);
+
+// Test endpoints for complete booking flow simulation
+router.post('/test-one-way-booking', authenticate, testOneWayBooking);
+router.post('/test-round-trip-booking', authenticate, testRoundTripBooking);
 
 module.exports = router;

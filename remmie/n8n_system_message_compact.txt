@@ -144,3 +144,4 @@ Perfect! Your round-trip is complete:
 - Search both directions in one API call
 - Skip user selection between flights
 - Use placeholders like [Date] in final output
+

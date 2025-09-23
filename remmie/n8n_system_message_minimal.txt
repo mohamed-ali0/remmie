@@ -33,3 +33,4 @@ One direction per search:
 ```
 
 Use exact offer IDs from search results. Backend handles the rest.
+
