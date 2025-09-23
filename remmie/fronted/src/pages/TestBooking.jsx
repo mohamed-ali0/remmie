@@ -207,7 +207,7 @@ export default function TestBooking() {
                 <h5 className="card-title">LAX → JFK</h5>
                 <p className="card-text">
                   <strong>Passenger:</strong> John Doe (Male, Adult)<br/>
-                  <strong>Date:</strong> February 15, 2025<br/>
+                         <strong>Date:</strong> December 15, 2025<br/>
                   <strong>Airline:</strong> American Airlines (AA1234)<br/>
                   <strong>Price:</strong> $539.50
                 </p>
@@ -249,8 +249,8 @@ export default function TestBooking() {
                 <h5 className="card-title">JFK ↔ LAX</h5>
                 <p className="card-text">
                   <strong>Passenger:</strong> Jane Smith (Female, Adult)<br/>
-                  <strong>Departure:</strong> March 10, 2025<br/>
-                  <strong>Return:</strong> March 17, 2025<br/>
+                         <strong>Departure:</strong> December 20, 2025<br/>
+                         <strong>Return:</strong> December 27, 2025<br/>
                   <strong>Airlines:</strong> Delta (DL5678) + United (UA9012)<br/>
                   <strong>Price:</strong> $865.80
                 </p>

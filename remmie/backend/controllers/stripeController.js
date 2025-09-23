@@ -975,7 +975,7 @@ async function testDuffelApi(req, res) {
           {
             origin: "LAX",
             destination: "JFK",
-            departure_date: "2025-02-15"
+            departure_date: "2025-12-15"
           }
         ],
         passengers: [
@@ -1048,7 +1048,7 @@ async function testOneWayBooking(req, res) {
           {
             origin: "LAX",
             destination: "JFK",
-            departure_date: "2025-02-15"
+            departure_date: "2025-12-15"
           }
         ],
         passengers: [
@@ -1218,12 +1218,12 @@ async function testRoundTripBooking(req, res) {
           {
             origin: "JFK",
             destination: "LAX",
-            departure_date: "2025-03-10"
+            departure_date: "2025-12-20"
           },
           {
             origin: "LAX",
             destination: "JFK",
-            departure_date: "2025-03-17"
+            departure_date: "2025-12-27"
           }
         ],
         passengers: [
