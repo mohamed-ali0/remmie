@@ -102,8 +102,8 @@ export default function TestBooking() {
         <div className="text-center mb-5">
           <h1 className="mb-3">Booking Flow Test Page</h1>
           <p className="text-muted">
-            Test the complete booking flow with mock data. These endpoints simulate real bookings 
-            and redirect to Stripe sandbox for payment testing.
+            Test the complete booking flow with real flight data from Duffel API. These endpoints 
+            search for actual flights, create real bookings, and redirect to Stripe sandbox for payment testing.
           </p>
         </div>
 
@@ -131,8 +131,8 @@ export default function TestBooking() {
                   <strong>Price:</strong> $539.50
                 </p>
                 <p className="text-muted small">
-                  This will create a mock one-way booking and redirect you to Stripe checkout 
-                  for payment testing.
+                  This will search for real flights, create a real booking in the database, 
+                  and redirect you to Stripe checkout for payment testing.
                 </p>
                 <Button 
                   variant="primary" 
@@ -174,8 +174,8 @@ export default function TestBooking() {
                   <strong>Price:</strong> $865.80
                 </p>
                 <p className="text-muted small">
-                  This will create a mock round-trip booking and redirect you to Stripe checkout 
-                  for payment testing.
+                  This will search for real round-trip flights, create a real booking in the database, 
+                  and redirect you to Stripe checkout for payment testing.
                 </p>
                 <Button 
                   variant="success" 
@@ -224,8 +224,9 @@ export default function TestBooking() {
                   <li>The success page will show all booking details including flight information</li>
                 </ol>
                 <div className="alert alert-info mt-3">
-                  <strong>Note:</strong> These are test bookings using sandbox data. No real flights 
-                  will be booked, and no real charges will be made.
+                  <strong>Note:</strong> These test bookings use real flight data from Duffel sandbox API. 
+                  Real bookings are created in the database, but no actual tickets will be issued since 
+                  we're using sandbox/test environment.
                 </div>
               </Card.Body>
             </Card>
