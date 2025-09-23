@@ -1114,38 +1114,64 @@ async function testOneWayBooking(req, res) {
     console.log('   Total amount:', totalAmount);
     console.log('   Currency:', currency);
 
-    // Insert booking into database
-    console.log('   Inserting into database...');
-    await pool.query(
-      `INSERT INTO ${dbPrefix}bookings 
-       (user_id, booking_reference, booking_json, guest_details, payment_status, amount, currency, created_at) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [
-        userId,
-        bookingRef,
-        JSON.stringify(searchResponse.data.data), // Store the full Duffel response
-        JSON.stringify({
-          contact: {
-            email: "test.user@example.com",
-            phone_number: "+1234567890"
-          },
-          passengers: [{
-            id: selectedPassenger.id,
-            type: "adult",
-            title: "Mr",
-            given_name: "John",
-            family_name: "Doe",
-            born_on: "1990-01-15",
-            phone_number: "+1234567890",
-            email: "test.user@example.com",
-            gender: "m"
-          }]
-        }),
-        'pending',
-        totalAmount,
-        currency
-      ]
-    );
+         // Insert booking into database
+         console.log('   Inserting into database...');
+         
+         // Store only essential flight data instead of full Duffel response
+         const essentialFlightData = {
+           offer_id: selectedOffer.id,
+           offer_request_id: searchResponse.data.data.id,
+           slices: selectedOffer.slices.map(slice => ({
+             origin: slice.origin,
+             destination: slice.destination,
+             departure_date: slice.segments[0].departing_at,
+             arrival_date: slice.segments[slice.segments.length - 1].arriving_at,
+             duration: slice.duration,
+             segments: slice.segments.map(seg => ({
+               origin: seg.origin.iata_code,
+               destination: seg.destination.iata_code,
+               departure: seg.departing_at,
+               arrival: seg.arriving_at,
+               airline: seg.marketing_carrier.iata_code,
+               flight_number: seg.marketing_carrier_flight_number
+             }))
+           })),
+           passengers: searchResponse.data.data.passengers,
+           total_amount: totalAmount,
+           currency: currency,
+           search_date: new Date().toISOString()
+         };
+         
+         await pool.query(
+           `INSERT INTO ${dbPrefix}bookings
+            (user_id, booking_reference, booking_json, guest_details, payment_status, amount, currency, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+           [
+             userId,
+             bookingRef,
+             JSON.stringify(essentialFlightData), // Store only essential data
+             JSON.stringify({
+               contact: {
+                 email: "test.user@example.com",
+                 phone_number: "+1234567890"
+               },
+               passengers: [{
+                 id: selectedPassenger.id,
+                 type: "adult",
+                 title: "Mr",
+                 given_name: "John",
+                 family_name: "Doe",
+                 born_on: "1990-01-15",
+                 phone_number: "+1234567890",
+                 email: "test.user@example.com",
+                 gender: "m"
+               }]
+             }),
+             'pending',
+             totalAmount,
+             currency
+           ]
+         );
 
     // Step 4: Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
@@ -1280,6 +1306,31 @@ async function testRoundTripBooking(req, res) {
     const currency = selectedOffer.total_currency;
 
     // Insert booking into database
+    // Store only essential flight data instead of full Duffel response
+    const essentialFlightData = {
+      offer_id: selectedOffer.id,
+      offer_request_id: searchResponse.data.data.id,
+      slices: selectedOffer.slices.map(slice => ({
+        origin: slice.origin,
+        destination: slice.destination,
+        departure_date: slice.segments[0].departing_at,
+        arrival_date: slice.segments[slice.segments.length - 1].arriving_at,
+        duration: slice.duration,
+        segments: slice.segments.map(seg => ({
+          origin: seg.origin.iata_code,
+          destination: seg.destination.iata_code,
+          departure: seg.departing_at,
+          arrival: seg.arriving_at,
+          airline: seg.marketing_carrier.iata_code,
+          flight_number: seg.marketing_carrier_flight_number
+        }))
+      })),
+      passengers: searchResponse.data.data.passengers,
+      total_amount: totalAmount,
+      currency: currency,
+      search_date: new Date().toISOString()
+    };
+    
     await pool.query(
       `INSERT INTO ${dbPrefix}bookings 
        (user_id, booking_reference, booking_json, guest_details, payment_status, amount, currency, created_at) 
@@ -1287,7 +1338,7 @@ async function testRoundTripBooking(req, res) {
       [
         userId,
         bookingRef,
-        JSON.stringify(searchResponse.data.data), // Store the full Duffel response
+        JSON.stringify(essentialFlightData), // Store only essential data
         JSON.stringify({
           contact: {
             email: "test.user@example.com",
