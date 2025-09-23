@@ -1629,14 +1629,25 @@ const createConformOrder = async (req, res) => {
         };
         
         // Update database with mock response
-        await pool.query(
-          `UPDATE ${dbPrefix}bookings 
-           SET conform_order_json = ?, updated_at = NOW()
-           WHERE id = ?`,
-          [JSON.stringify(mockResponse), id]
-        );
+        console.log('💾 Updating database with mock response...');
+        console.log('   Booking ID:', id);
+        console.log('   Mock response:', JSON.stringify(mockResponse, null, 2));
         
-        return res.status(200).json(mockResponse);
+        try {
+          await pool.query(
+            `UPDATE ${dbPrefix}bookings 
+             SET conform_order_json = ?, updated_at = NOW()
+             WHERE id = ?`,
+            [JSON.stringify(mockResponse), id]
+          );
+          
+          console.log('✅ Database updated successfully with mock response');
+          return res.status(200).json(mockResponse);
+        } catch (dbError) {
+          console.error('❌ Database update failed:', dbError);
+          // Still return the mock response even if DB update fails
+          return res.status(200).json(mockResponse);
+        }
       }
     }
     
