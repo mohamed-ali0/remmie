@@ -1157,36 +1157,44 @@ async function testOneWayBooking(req, res) {
            }
          };
          
-         await pool.query(
-           `INSERT INTO ${dbPrefix}bookings
-            (user_id, booking_reference, booking_json, guest_details, payment_status, amount, currency, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-           [
-             userId,
-             bookingRef,
-             JSON.stringify(essentialFlightData), // Store only essential data
-             JSON.stringify({
-               contact: {
-                 email: "test.user@example.com",
-                 phone_number: "+1234567890"
-               },
-               passengers: [{
-                 id: selectedPassenger.id,
-                 type: "adult",
-                 title: "Mr",
-                 given_name: "John",
-                 family_name: "Doe",
-                 born_on: "1990-01-15",
-                 phone_number: "+1234567890",
-                 email: "test.user@example.com",
-                 gender: "m"
-               }]
-             }),
-             'pending',
-             totalAmount,
-             currency
-           ]
-         );
+         try {
+           const result = await pool.query(
+             `INSERT INTO ${dbPrefix}bookings
+              (user_id, booking_reference, booking_json, guest_details, payment_status, amount, currency, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+             [
+               userId,
+               bookingRef,
+               JSON.stringify(essentialFlightData), // Store only essential data
+               JSON.stringify({
+                 contact: {
+                   email: "test.user@example.com",
+                   phone_number: "+1234567890"
+                 },
+                 passengers: [{
+                   id: selectedPassenger.id,
+                   type: "adult",
+                   title: "Mr",
+                   given_name: "John",
+                   family_name: "Doe",
+                   born_on: "1990-01-15",
+                   phone_number: "+1234567890",
+                   email: "test.user@example.com",
+                   gender: "m"
+                 }]
+               }),
+               'pending',
+               totalAmount,
+               currency
+             ]
+           );
+           
+           console.log('✅ Database insertion completed successfully');
+           console.log('   Insert ID:', result[0].insertId);
+         } catch (dbError) {
+           console.error('❌ Database insertion failed:', dbError);
+           throw dbError;
+         }
 
     // Step 4: Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
@@ -1361,36 +1369,44 @@ async function testRoundTripBooking(req, res) {
       }
     };
     
-    await pool.query(
-      `INSERT INTO ${dbPrefix}bookings 
-       (user_id, booking_reference, booking_json, guest_details, payment_status, amount, currency, created_at) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [
-        userId,
-        bookingRef,
-        JSON.stringify(essentialFlightData), // Store only essential data
-        JSON.stringify({
-          contact: {
-            email: "test.user@example.com",
-            phone_number: "+1234567890"
-          },
-          passengers: [{
-            id: selectedPassenger.id,
-            type: "adult",
-            title: "Ms",
-            given_name: "Jane",
-            family_name: "Smith",
-            born_on: "1985-05-20",
-            phone_number: "+1234567890",
-            email: "test.user@example.com",
-            gender: "f"
-          }]
-        }),
-        'pending',
-        totalAmount,
-        currency
-      ]
-    );
+    try {
+      const result = await pool.query(
+        `INSERT INTO ${dbPrefix}bookings 
+         (user_id, booking_reference, booking_json, guest_details, payment_status, amount, currency, created_at) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [
+          userId,
+          bookingRef,
+          JSON.stringify(essentialFlightData), // Store only essential data
+          JSON.stringify({
+            contact: {
+              email: "test.user@example.com",
+              phone_number: "+1234567890"
+            },
+            passengers: [{
+              id: selectedPassenger.id,
+              type: "adult",
+              title: "Ms",
+              given_name: "Jane",
+              family_name: "Smith",
+              born_on: "1985-05-20",
+              phone_number: "+1234567890",
+              email: "test.user@example.com",
+              gender: "f"
+            }]
+          }),
+          'pending',
+          totalAmount,
+          currency
+        ]
+      );
+      
+      console.log('✅ Round-trip database insertion completed successfully');
+      console.log('   Insert ID:', result[0].insertId);
+    } catch (dbError) {
+      console.error('❌ Round-trip database insertion failed:', dbError);
+      throw dbError;
+    }
 
     // Step 4: Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
