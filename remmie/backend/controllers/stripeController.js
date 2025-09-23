@@ -1121,6 +1121,7 @@ async function testOneWayBooking(req, res) {
          const essentialFlightData = {
            data: {
              offer_id: selectedOffer.id,
+             selected_offers: [selectedOffer.id], // Add this array for createConformOrder
              offer_request_id: searchResponse.data.data.id,
              slices: selectedOffer.slices.map(slice => ({
                origin: slice.origin,
@@ -1333,6 +1334,7 @@ async function testRoundTripBooking(req, res) {
     const essentialFlightData = {
       data: {
         offer_id: selectedOffer.id,
+        selected_offers: [selectedOffer.id], // Add this array for createConformOrder
         offer_request_id: searchResponse.data.data.id,
         slices: selectedOffer.slices.map(slice => ({
           origin: slice.origin,
