@@ -973,21 +973,19 @@ async function testOneWayBooking(req, res) {
     
     // Step 1: Search for real flights using Duffel API
     const flightSearchData = {
-      data: {
-        slices: [
-          {
-            origin: "LAX",
-            destination: "JFK",
-            departure_date: "2025-02-15"
-          }
-        ],
-        passengers: [
-          {
-            type: "adult"
-          }
-        ],
-        cabin_class: "economy"
-      }
+      slices: [
+        {
+          origin: "LAX",
+          destination: "JFK",
+          departure_date: "2025-02-15"
+        }
+      ],
+      passengers: [
+        {
+          type: "adult"
+        }
+      ],
+      cabin_class: "economy"
     };
 
     console.log('🔍 Searching for real flights...');
@@ -1143,26 +1141,24 @@ async function testRoundTripBooking(req, res) {
     
     // Step 1: Search for real round-trip flights using Duffel API
     const flightSearchData = {
-      data: {
-        slices: [
-          {
-            origin: "JFK",
-            destination: "LAX",
-            departure_date: "2025-03-10"
-          },
-          {
-            origin: "LAX",
-            destination: "JFK",
-            departure_date: "2025-03-17"
-          }
-        ],
-        passengers: [
-          {
-            type: "adult"
-          }
-        ],
-        cabin_class: "economy"
-      }
+      slices: [
+        {
+          origin: "JFK",
+          destination: "LAX",
+          departure_date: "2025-03-10"
+        },
+        {
+          origin: "LAX",
+          destination: "JFK",
+          departure_date: "2025-03-17"
+        }
+      ],
+      passengers: [
+        {
+          type: "adult"
+        }
+      ],
+      cabin_class: "economy"
     };
 
     console.log('🔍 Searching for real round-trip flights...');
