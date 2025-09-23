@@ -1617,7 +1617,7 @@ const createConformOrder = async (req, res) => {
         
         const mockResponse = {
           data: {
-            id: `mock_order_${requestData.id}`,
+            id: `mock_order_${id}`,
             booking_reference: `MOCK-${Date.now()}`,
             status: 'confirmed',
             message: 'Booking confirmed (test mode - offer expired/price changed)',
@@ -1633,7 +1633,7 @@ const createConformOrder = async (req, res) => {
           `UPDATE ${dbPrefix}bookings 
            SET conform_order_json = ?, updated_at = NOW()
            WHERE id = ?`,
-          [JSON.stringify(mockResponse), requestData.id]
+          [JSON.stringify(mockResponse), id]
         );
         
         return res.status(200).json(mockResponse);
