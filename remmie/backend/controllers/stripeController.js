@@ -1172,23 +1172,23 @@ async function testOneWayBooking(req, res) {
                userId,
                bookingRef,
                JSON.stringify(essentialFlightData), // Store only essential data
-               JSON.stringify({
-                 contact: {
-                   email: "test.user@example.com",
-                   phone_number: "+1234567890"
-                 },
-                 passengers: [{
-                   id: selectedPassenger.id,
-                   type: "adult",
-                   title: "Mr",
-                   given_name: "John",
-                   family_name: "Doe",
-                   born_on: "1990-01-15",
-                   phone_number: "+1234567890",
-                   email: "test.user@example.com",
-                   gender: "m"
-                 }]
-               }),
+                 JSON.stringify({
+                   contact: {
+                     email: "test.user@example.com",
+                     phone_number: "+14155552671"
+                   },
+                   passengers: [{
+                     id: selectedPassenger.id,
+                     type: "adult",
+                     title: "Mr",
+                     given_name: "John",
+                     family_name: "Doe",
+                     born_on: "1990-01-15",
+                     phone_number: "+14155552671",
+                     email: "test.user@example.com",
+                     gender: "m"
+                   }]
+                 }),
                'pending',
                totalAmount,
                currency
@@ -1393,7 +1393,7 @@ async function testRoundTripBooking(req, res) {
           JSON.stringify({
             contact: {
               email: "test.user@example.com",
-              phone_number: "+1234567890"
+              phone_number: "+14155552671"
             },
             passengers: [{
               id: selectedPassenger.id,
@@ -1402,7 +1402,7 @@ async function testRoundTripBooking(req, res) {
               given_name: "Jane",
               family_name: "Smith",
               born_on: "1985-05-20",
-              phone_number: "+1234567890",
+              phone_number: "+14155552671",
               email: "test.user@example.com",
               gender: "f"
             }]
