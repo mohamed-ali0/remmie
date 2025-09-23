@@ -1365,11 +1365,18 @@ const createConformOrder = async (req, res) => {
     
     const hasRoundTripSession = bookingRows.length > 0 && bookingRows[0].round_trip_session_id;
     
+    // Check if this is a test booking first
+    const isTestBooking = data.is_test_booking;
+    
     // Check if this is a round-trip booking (either has session or has combined offer ID)
-    const selectedOfferId = data.selected_offers[0];
+    const selectedOfferId = data.selected_offers ? data.selected_offers[0] : null;
     const isOldRoundTrip = selectedOfferId && selectedOfferId.startsWith('rt_');
     
-    if (hasRoundTripSession) {
+    if (isTestBooking) {
+      // Test booking: search for fresh offers and create order
+      console.log('🧪 Processing test booking with fresh offer search');
+      // This will be handled in the else block below
+    } else if (hasRoundTripSession) {
       // New round-trip design: already have separate bookings with session ID
       console.log('🔄 Processing round-trip with session ID:', bookingRows[0].round_trip_session_id);
       
@@ -1559,8 +1566,8 @@ const createConformOrder = async (req, res) => {
       res.status(200).json(combinedOrderJson);
       
     } else {
-      // One-way booking (original logic)
-      console.log('✈️ Processing one-way booking');
+      // One-way booking or test booking (original logic)
+      console.log('✈️ Processing one-way booking or test booking');
       
       // Check if this is a test booking that needs fresh offers
       if (data.is_test_booking && data.search_params) {
