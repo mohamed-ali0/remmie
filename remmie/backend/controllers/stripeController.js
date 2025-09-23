@@ -1117,29 +1117,44 @@ async function testOneWayBooking(req, res) {
          // Insert booking into database
          console.log('   Inserting into database...');
          
-         // Store only essential flight data instead of full Duffel response
+         // Store essential flight data in the format expected by frontend
          const essentialFlightData = {
-           offer_id: selectedOffer.id,
-           offer_request_id: searchResponse.data.data.id,
-           slices: selectedOffer.slices.map(slice => ({
-             origin: slice.origin,
-             destination: slice.destination,
-             departure_date: slice.segments[0].departing_at,
-             arrival_date: slice.segments[slice.segments.length - 1].arriving_at,
-             duration: slice.duration,
-             segments: slice.segments.map(seg => ({
-               origin: seg.origin.iata_code,
-               destination: seg.destination.iata_code,
-               departure: seg.departing_at,
-               arrival: seg.arriving_at,
-               airline: seg.marketing_carrier.iata_code,
-               flight_number: seg.marketing_carrier_flight_number
-             }))
-           })),
-           passengers: searchResponse.data.data.passengers,
-           total_amount: totalAmount,
-           currency: currency,
-           search_date: new Date().toISOString()
+           data: {
+             offer_id: selectedOffer.id,
+             offer_request_id: searchResponse.data.data.id,
+             slices: selectedOffer.slices.map(slice => ({
+               origin: slice.origin,
+               destination: slice.destination,
+               departure_date: slice.segments[0].departing_at,
+               arrival_date: slice.segments[slice.segments.length - 1].arriving_at,
+               duration: slice.duration,
+               segments: slice.segments.map(seg => ({
+                 origin: seg.origin,
+                 destination: seg.destination,
+                 departing_at: seg.departing_at,
+                 arriving_at: seg.arriving_at,
+                 operating_carrier: seg.operating_carrier,
+                 marketing_carrier: seg.marketing_carrier,
+                 operating_carrier_flight_number: seg.operating_carrier_flight_number,
+                 marketing_carrier_flight_number: seg.marketing_carrier_flight_number,
+                 aircraft: seg.aircraft,
+                 distance: seg.distance,
+                 passengers: seg.passengers,
+                 origin_terminal: seg.origin_terminal,
+                 destination_terminal: seg.destination_terminal,
+                 duration: seg.duration,
+                 stops: seg.stops
+               })),
+               conditions: slice.conditions
+             })),
+             passengers: searchResponse.data.data.passengers,
+             total_amount: totalAmount,
+             currency: currency,
+             base_amount: selectedOffer.base_amount,
+             tax_amount: selectedOffer.tax_amount,
+             conditions: selectedOffer.conditions,
+             search_date: new Date().toISOString()
+           }
          };
          
          await pool.query(
@@ -1306,29 +1321,44 @@ async function testRoundTripBooking(req, res) {
     const currency = selectedOffer.total_currency;
 
     // Insert booking into database
-    // Store only essential flight data instead of full Duffel response
+    // Store essential flight data in the format expected by frontend
     const essentialFlightData = {
-      offer_id: selectedOffer.id,
-      offer_request_id: searchResponse.data.data.id,
-      slices: selectedOffer.slices.map(slice => ({
-        origin: slice.origin,
-        destination: slice.destination,
-        departure_date: slice.segments[0].departing_at,
-        arrival_date: slice.segments[slice.segments.length - 1].arriving_at,
-        duration: slice.duration,
-        segments: slice.segments.map(seg => ({
-          origin: seg.origin.iata_code,
-          destination: seg.destination.iata_code,
-          departure: seg.departing_at,
-          arrival: seg.arriving_at,
-          airline: seg.marketing_carrier.iata_code,
-          flight_number: seg.marketing_carrier_flight_number
-        }))
-      })),
-      passengers: searchResponse.data.data.passengers,
-      total_amount: totalAmount,
-      currency: currency,
-      search_date: new Date().toISOString()
+      data: {
+        offer_id: selectedOffer.id,
+        offer_request_id: searchResponse.data.data.id,
+        slices: selectedOffer.slices.map(slice => ({
+          origin: slice.origin,
+          destination: slice.destination,
+          departure_date: slice.segments[0].departing_at,
+          arrival_date: slice.segments[slice.segments.length - 1].arriving_at,
+          duration: slice.duration,
+          segments: slice.segments.map(seg => ({
+            origin: seg.origin,
+            destination: seg.destination,
+            departing_at: seg.departing_at,
+            arriving_at: seg.arriving_at,
+            operating_carrier: seg.operating_carrier,
+            marketing_carrier: seg.marketing_carrier,
+            operating_carrier_flight_number: seg.operating_carrier_flight_number,
+            marketing_carrier_flight_number: seg.marketing_carrier_flight_number,
+            aircraft: seg.aircraft,
+            distance: seg.distance,
+            passengers: seg.passengers,
+            origin_terminal: seg.origin_terminal,
+            destination_terminal: seg.destination_terminal,
+            duration: seg.duration,
+            stops: seg.stops
+          })),
+          conditions: slice.conditions
+        })),
+        passengers: searchResponse.data.data.passengers,
+        total_amount: totalAmount,
+        currency: currency,
+        base_amount: selectedOffer.base_amount,
+        tax_amount: selectedOffer.tax_amount,
+        conditions: selectedOffer.conditions,
+        search_date: new Date().toISOString()
+      }
     };
     
     await pool.query(
