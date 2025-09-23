@@ -4,8 +4,8 @@ import { IconPlane, IconPlaneTilt, IconCheck, IconX } from '@tabler/icons-react'
 import axios from 'axios';
 
 export default function TestBooking() {
-  const [loading, setLoading] = useState({ oneWay: false, roundTrip: false, basic: false });
-  const [results, setResults] = useState({ oneWay: null, roundTrip: null, basic: null });
+  const [loading, setLoading] = useState({ oneWay: false, roundTrip: false, basic: false, duffelApi: false });
+  const [results, setResults] = useState({ oneWay: null, roundTrip: null, basic: null, duffelApi: null });
   const [error, setError] = useState('');
 
   const handleTestBooking = async (type) => {
@@ -19,6 +19,15 @@ export default function TestBooking() {
       if (type === 'basic') {
         response = await axios.get(
           `${import.meta.env.VITE_API_BASE_URL}/api/stripe/test-basic`,
+          { 
+            headers: { 
+              Authorization: `Bearer ${localStorage.getItem('token')}` 
+            } 
+          }
+        );
+      } else if (type === 'duffelApi') {
+        response = await axios.get(
+          `${import.meta.env.VITE_API_BASE_URL}/api/stripe/test-duffel-api`,
           { 
             headers: { 
               Authorization: `Bearer ${localStorage.getItem('token')}` 
@@ -44,7 +53,7 @@ export default function TestBooking() {
         }));
         
         // Redirect to payment page (only for booking tests)
-        if (type !== 'basic' && response.data.payment_url) {
+        if (type !== 'basic' && type !== 'duffelApi' && response.data.payment_url) {
           window.open(response.data.payment_url, '_blank');
         }
       } else {
@@ -121,7 +130,7 @@ export default function TestBooking() {
             search for actual flights, create real bookings, and redirect to Stripe sandbox for payment testing.
           </p>
           
-          {/* Basic Test Button */}
+          {/* Test Buttons */}
           <div className="mb-4">
             <Button 
               variant="outline-primary" 
@@ -138,10 +147,42 @@ export default function TestBooking() {
                 'Test Basic Connectivity'
               )}
             </Button>
+            
+            <Button 
+              variant="outline-info" 
+              onClick={() => handleTestBooking('duffelApi')}
+              disabled={loading.duffelApi}
+              className="me-2"
+            >
+              {loading.duffelApi ? (
+                <>
+                  <Spinner animation="border" size="sm" className="me-2" />
+                  Testing...
+                </>
+              ) : (
+                'Test Duffel API'
+              )}
+            </Button>
+            
             {results.basic && (
               <Alert variant="success" className="mt-2">
                 <IconCheck className="me-2" />
                 {results.basic.message}
+              </Alert>
+            )}
+            
+            {results.duffelApi && (
+              <Alert variant={results.duffelApi.success ? "success" : "danger"} className="mt-2">
+                <IconCheck className="me-2" />
+                {results.duffelApi.message}
+                {results.duffelApi.error && (
+                  <div className="mt-2">
+                    <strong>Error Details:</strong>
+                    <pre className="mt-1" style={{fontSize: '12px', backgroundColor: '#f8f9fa', padding: '8px', borderRadius: '4px'}}>
+                      {JSON.stringify(results.duffelApi.error, null, 2)}
+                    </pre>
+                  </div>
+                )}
               </Alert>
             )}
           </div>

@@ -964,6 +964,76 @@ async function testBasic(req, res) {
   }
 }
 
+// Test Duffel API directly
+async function testDuffelApi(req, res) {
+  try {
+    console.log('🧪 Testing Duffel API directly...');
+    
+    const testData = {
+      data: {
+        slices: [
+          {
+            origin: "LAX",
+            destination: "JFK",
+            departure_date: "2025-02-15"
+          }
+        ],
+        passengers: [
+          {
+            type: "adult"
+          }
+        ],
+        cabin_class: "economy"
+      }
+    };
+    
+    console.log('📋 Test data:', JSON.stringify(testData, null, 2));
+    
+    try {
+      const response = await axios.post(
+        `${process.env.DUFFEL_API_URL}/air/offer_requests`,
+        testData,
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.DUFFEL_ACCESS_TOKENS}`,
+            'Accept-Encoding': 'gzip',
+            'Accept': 'application/json',
+            'Duffel-Version': 'v2',
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      console.log('✅ Duffel API test successful');
+      res.json({
+        success: true,
+        message: 'Duffel API test successful',
+        offers_count: response.data.data?.offers?.length || 0,
+        response: response.data
+      });
+      
+    } catch (apiError) {
+      console.error('❌ Duffel API test failed:', apiError.response?.status);
+      console.error('📋 Error response:', JSON.stringify(apiError.response?.data, null, 2));
+      
+      res.json({
+        success: false,
+        message: 'Duffel API test failed',
+        status: apiError.response?.status,
+        error: apiError.response?.data
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ Test error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Test failed',
+      error: error.message
+    });
+  }
+}
+
 // Test endpoints for complete booking flow simulation
 async function testOneWayBooking(req, res) {
   try {
@@ -1315,6 +1385,7 @@ module.exports = {
   PaymentTest,
   testApiConfig,
   testBasic,
+  testDuffelApi,
   testOneWayBooking,
   testRoundTripBooking
 };
