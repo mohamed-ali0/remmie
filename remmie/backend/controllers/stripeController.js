@@ -1149,6 +1149,11 @@ async function testOneWayBooking(req, res) {
                conditions: slice.conditions
              })),
              passengers: searchResponse.data.data.passengers,
+             payments: [{
+               type: "balance",
+               amount: totalAmount,
+               currency: currency
+             }],
              total_amount: totalAmount,
              currency: currency,
              base_amount: selectedOffer.base_amount,
@@ -1362,6 +1367,11 @@ async function testRoundTripBooking(req, res) {
           conditions: slice.conditions
         })),
         passengers: searchResponse.data.data.passengers,
+        payments: [{
+          type: "balance",
+          amount: totalAmount,
+          currency: currency
+        }],
         total_amount: totalAmount,
         currency: currency,
         base_amount: selectedOffer.base_amount,
