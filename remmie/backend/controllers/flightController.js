@@ -1562,6 +1562,67 @@ const createConformOrder = async (req, res) => {
       // One-way booking (original logic)
       console.log('✈️ Processing one-way booking');
       
+      // Check if this is a test booking that needs fresh offers
+      if (data.is_test_booking && data.search_params) {
+        console.log('🧪 Test booking detected - searching for fresh offers...');
+        
+        // Search for fresh offers using stored search parameters
+        const searchData = {
+          data: {
+            slices: [{
+              origin: data.search_params.origin,
+              destination: data.search_params.destination,
+              departure_date: data.search_params.departure_date
+            }],
+            passengers: data.search_params.passengers,
+            cabin_class: data.search_params.cabin_class
+          }
+        };
+        
+        try {
+          const freshSearchResponse = await axios.post(
+            `${duffel_api_url}/air/offer_requests`,
+            searchData,
+            {
+              headers: {
+                'Authorization': `Bearer ${duffel_access_tokens}`,
+                'Accept-Encoding': 'gzip',
+                'Accept': 'application/json',
+                'Duffel-Version': 'v2',
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          
+          if (freshSearchResponse.data.data.offers && freshSearchResponse.data.data.offers.length > 0) {
+            const freshOffer = freshSearchResponse.data.data.offers[0];
+            console.log('✅ Fresh offer found:', freshOffer.id);
+            
+            // Update data with fresh offer information
+            data.offer_id = freshOffer.id;
+            data.selected_offers = [freshOffer.id];
+            data.offer_request_id = freshSearchResponse.data.data.id;
+            data.slices = freshOffer.slices;
+            data.passengers = freshSearchResponse.data.data.passengers;
+            data.total_amount = freshOffer.total_amount;
+            data.currency = freshOffer.total_currency;
+            data.base_amount = freshOffer.base_amount;
+            data.tax_amount = freshOffer.tax_amount;
+            data.conditions = freshOffer.conditions;
+            data.payments = [{
+              type: "balance",
+              amount: freshOffer.total_amount,
+              currency: freshOffer.total_currency
+            }];
+          } else {
+            console.log('⚠️ No fresh offers found, using original data');
+          }
+        } catch (searchError) {
+          console.error('❌ Failed to search for fresh offers:', searchError.message);
+          console.log('⚠️ Using original data for test booking');
+        }
+      }
+      
       console.log('🚀 Creating Duffel order with data:', JSON.stringify(data, null, 2));
       
       const response = await axios.post(

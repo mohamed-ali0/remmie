@@ -1117,49 +1117,32 @@ async function testOneWayBooking(req, res) {
          // Insert booking into database
          console.log('   Inserting into database...');
          
-         // Store essential flight data in the format expected by frontend
+         // Store minimal flight data for test bookings (no offer data to avoid expiration)
          const essentialFlightData = {
            data: {
-             offer_id: selectedOffer.id,
-             selected_offers: [selectedOffer.id], // Add this array for createConformOrder
-             offer_request_id: searchResponse.data.data.id,
-             slices: selectedOffer.slices.map(slice => ({
-               origin: slice.origin,
-               destination: slice.destination,
-               departure_date: slice.segments[0].departing_at,
-               arrival_date: slice.segments[slice.segments.length - 1].arriving_at,
-               duration: slice.duration,
-               segments: slice.segments.map(seg => ({
-                 origin: seg.origin,
-                 destination: seg.destination,
-                 departing_at: seg.departing_at,
-                 arriving_at: seg.arriving_at,
-                 operating_carrier: seg.operating_carrier,
-                 marketing_carrier: seg.marketing_carrier,
-                 operating_carrier_flight_number: seg.operating_carrier_flight_number,
-                 marketing_carrier_flight_number: seg.marketing_carrier_flight_number,
-                 aircraft: seg.aircraft,
-                 distance: seg.distance,
-                 passengers: seg.passengers,
-                 origin_terminal: seg.origin_terminal,
-                 destination_terminal: seg.destination_terminal,
-                 duration: seg.duration,
-                 stops: seg.stops
-               })),
-               conditions: slice.conditions
-             })),
+             // Store search parameters instead of offer data
+             search_params: {
+               origin: "LAX",
+               destination: "JFK",
+               departure_date: "2025-12-15",
+               passengers: [{ type: "adult" }],
+               cabin_class: "economy"
+             },
+             // Store basic flight info for display
+             flight_info: {
+               origin: selectedOffer.slices[0].origin.iata_code,
+               destination: selectedOffer.slices[0].destination.iata_code,
+               departure_date: selectedOffer.slices[0].segments[0].departing_at,
+               arrival_date: selectedOffer.slices[selectedOffer.slices.length - 1].segments[selectedOffer.slices[selectedOffer.slices.length - 1].segments.length - 1].arriving_at,
+               duration: selectedOffer.slices[0].duration,
+               airline: selectedOffer.slices[0].segments[0].marketing_carrier.name,
+               flight_number: selectedOffer.slices[0].segments[0].marketing_carrier_flight_number
+             },
              passengers: searchResponse.data.data.passengers,
-             payments: [{
-               type: "balance",
-               amount: totalAmount,
-               currency: currency
-             }],
              total_amount: totalAmount,
              currency: currency,
-             base_amount: selectedOffer.base_amount,
-             tax_amount: selectedOffer.tax_amount,
-             conditions: selectedOffer.conditions,
-             search_date: new Date().toISOString()
+             search_date: new Date().toISOString(),
+             is_test_booking: true // Flag to indicate this is a test booking
            }
          };
          
