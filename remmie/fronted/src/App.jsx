@@ -24,6 +24,7 @@ import Bookingdetails from './pages/Bookingdetails';
 import Staybookingsuccess from './pages/Staybookingsuccess';
 import Changepassword from './pages/Changepassword';
 import Paymentmathod from './pages/Paymentmathod';
+import TestBooking from './pages/TestBooking';
 import { getToken, isTokenExpired } from './utils/auth';
 import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
@@ -81,6 +82,8 @@ function AppContent() {
                 <Route exact path="/change-password" element={<Changepassword/>} />
                 {/*<Route exact path="/payment-mathod" element={<Paymentmathod/>} />*/}
                 
+                {/* Test booking page */}
+                <Route exact path="/test" element={<TestBooking/>} />
                 
                 {/* PaymentMethod page Stripe Elements */}
                 <Route
