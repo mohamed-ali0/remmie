@@ -926,10 +926,50 @@ async function testApiConfig(req, res) {
   }
 }
 
+// Simple test endpoint to check basic functionality
+async function testBasic(req, res) {
+  try {
+    console.log('🧪 Basic test endpoint called');
+    
+    // Test database connection
+    console.log('🔗 Testing database connection...');
+    const [dbTest] = await pool.query('SELECT 1 as test');
+    console.log('✅ Database connection successful:', dbTest[0]);
+    
+    // Test environment variables
+    console.log('🔑 Environment variables:');
+    console.log('   DUFFEL_API_URL:', process.env.DUFFEL_API_URL);
+    console.log('   DUFFEL_ACCESS_TOKENS configured:', !!process.env.DUFFEL_ACCESS_TOKENS);
+    console.log('   STRIPE_SECRET_KEY configured:', !!process.env.STRIPE_SECRET_KEY);
+    console.log('   FRONTEND_URL:', process.env.FRONTEND_URL);
+    
+    res.json({
+      success: true,
+      message: 'Basic test successful',
+      database: 'connected',
+      environment: {
+        duffel_api_url: process.env.DUFFEL_API_URL,
+        duffel_token_configured: !!process.env.DUFFEL_ACCESS_TOKENS,
+        stripe_key_configured: !!process.env.STRIPE_SECRET_KEY,
+        frontend_url: process.env.FRONTEND_URL
+      }
+    });
+  } catch (error) {
+    console.error('❌ Basic test error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Basic test failed',
+      error: error.message
+    });
+  }
+}
+
 // Test endpoints for complete booking flow simulation
 async function testOneWayBooking(req, res) {
   try {
+    console.log('🚀 Starting test one-way booking...');
     const userId = req.user.userId;
+    console.log('👤 User ID:', userId);
     
     // Step 1: Search for real flights using Duffel API
     const flightSearchData = {
@@ -951,8 +991,13 @@ async function testOneWayBooking(req, res) {
     };
 
     console.log('🔍 Searching for real flights...');
+    console.log('📋 Flight search data:', JSON.stringify(flightSearchData, null, 2));
     
     // Check if Duffel API credentials are configured
+    console.log('🔑 Checking API credentials...');
+    console.log('   DUFFEL_API_URL:', process.env.DUFFEL_API_URL);
+    console.log('   DUFFEL_ACCESS_TOKENS configured:', !!process.env.DUFFEL_ACCESS_TOKENS);
+    
     if (!process.env.DUFFEL_ACCESS_TOKENS || !process.env.DUFFEL_API_URL) {
       console.error('❌ Duffel API credentials not configured');
       return res.status(500).json({
@@ -990,11 +1035,17 @@ async function testOneWayBooking(req, res) {
     console.log('✅ Selected flight offer:', selectedOffer.id);
 
     // Step 3: Create booking in database
+    console.log('💾 Creating database booking...');
     const bookingRef = `TEST_OW_${Date.now()}`;
     const totalAmount = parseFloat(selectedOffer.total_amount);
     const currency = selectedOffer.total_currency;
+    
+    console.log('   Booking ref:', bookingRef);
+    console.log('   Total amount:', totalAmount);
+    console.log('   Currency:', currency);
 
     // Insert booking into database
+    console.log('   Inserting into database...');
     await pool.query(
       `INSERT INTO ${dbPrefix}bookings 
        (user_id, booking_reference, booking_json, guest_details, payment_status, amount, currency, created_at) 
@@ -1263,6 +1314,7 @@ module.exports = {
   userPaymentMethodsDelete,
   PaymentTest,
   testApiConfig,
+  testBasic,
   testOneWayBooking,
   testRoundTripBooking
 };

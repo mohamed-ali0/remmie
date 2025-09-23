@@ -11,6 +11,7 @@ const { createFlightPaymentSession,
 		userPaymentMethodsDelete,
 		PaymentTest,
 		testApiConfig,
+		testBasic,
 		testOneWayBooking,
 		testRoundTripBooking
 	} = require('../controllers/stripeController');
@@ -33,6 +34,7 @@ router.post('/payment-test',PaymentTest);
 
 // Test endpoints for complete booking flow simulation
 router.get('/test-api-config', authenticate, testApiConfig);
+router.get('/test-basic', authenticate, testBasic);
 router.post('/test-one-way-booking', authenticate, testOneWayBooking);
 router.post('/test-round-trip-booking', authenticate, testRoundTripBooking);
 

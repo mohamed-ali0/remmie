@@ -4,8 +4,8 @@ import { IconPlane, IconPlaneTilt, IconCheck, IconX } from '@tabler/icons-react'
 import axios from 'axios';
 
 export default function TestBooking() {
-  const [loading, setLoading] = useState({ oneWay: false, roundTrip: false });
-  const [results, setResults] = useState({ oneWay: null, roundTrip: null });
+  const [loading, setLoading] = useState({ oneWay: false, roundTrip: false, basic: false });
+  const [results, setResults] = useState({ oneWay: null, roundTrip: null, basic: null });
   const [error, setError] = useState('');
 
   const handleTestBooking = async (type) => {
@@ -14,15 +14,28 @@ export default function TestBooking() {
     setResults(prev => ({ ...prev, [type]: null }));
 
     try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_BASE_URL}/api/stripe/test-${type === 'oneWay' ? 'one-way' : 'round-trip'}-booking`,
-        {},
-        { 
-          headers: { 
-            Authorization: `Bearer ${localStorage.getItem('token')}` 
-          } 
-        }
-      );
+      let response;
+      
+      if (type === 'basic') {
+        response = await axios.get(
+          `${import.meta.env.VITE_API_BASE_URL}/api/stripe/test-basic`,
+          { 
+            headers: { 
+              Authorization: `Bearer ${localStorage.getItem('token')}` 
+            } 
+          }
+        );
+      } else {
+        response = await axios.post(
+          `${import.meta.env.VITE_API_BASE_URL}/api/stripe/test-${type === 'oneWay' ? 'one-way' : 'round-trip'}-booking`,
+          {},
+          { 
+            headers: { 
+              Authorization: `Bearer ${localStorage.getItem('token')}` 
+            } 
+          }
+        );
+      }
 
       if (response.data.success) {
         setResults(prev => ({ 
@@ -30,8 +43,10 @@ export default function TestBooking() {
           [type]: response.data 
         }));
         
-        // Redirect to payment page
-        window.open(response.data.payment_url, '_blank');
+        // Redirect to payment page (only for booking tests)
+        if (type !== 'basic' && response.data.payment_url) {
+          window.open(response.data.payment_url, '_blank');
+        }
       } else {
         setError(`Failed to create ${type} booking: ${response.data.message}`);
       }
@@ -105,6 +120,31 @@ export default function TestBooking() {
             Test the complete booking flow with real flight data from Duffel API. These endpoints 
             search for actual flights, create real bookings, and redirect to Stripe sandbox for payment testing.
           </p>
+          
+          {/* Basic Test Button */}
+          <div className="mb-4">
+            <Button 
+              variant="outline-primary" 
+              onClick={() => handleTestBooking('basic')}
+              disabled={loading.basic}
+              className="me-2"
+            >
+              {loading.basic ? (
+                <>
+                  <Spinner animation="border" size="sm" className="me-2" />
+                  Testing...
+                </>
+              ) : (
+                'Test Basic Connectivity'
+              )}
+            </Button>
+            {results.basic && (
+              <Alert variant="success" className="mt-2">
+                <IconCheck className="me-2" />
+                {results.basic.message}
+              </Alert>
+            )}
+          </div>
         </div>
 
         {error && (
