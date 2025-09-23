@@ -1614,10 +1614,12 @@ const createConformOrder = async (req, res) => {
           errorMessage.includes('price_changed') ||
           errorCode === 'price_changed') {
         console.log('⚠️ Offer expired/price changed, creating mock confirmation for testing');
+        console.log('🔍 Debug - id variable:', id);
+        console.log('🔍 Debug - data variable:', data);
         
         const mockResponse = {
           data: {
-            id: `mock_order_${id}`,
+            id: `mock_order_${requestData.id}`,
             booking_reference: `MOCK-${Date.now()}`,
             status: 'confirmed',
             message: 'Booking confirmed (test mode - offer expired/price changed)',
@@ -1630,7 +1632,7 @@ const createConformOrder = async (req, res) => {
         
         // Update database with mock response
         console.log('💾 Updating database with mock response...');
-        console.log('   Booking ID:', id);
+        console.log('   Booking ID:', requestData.id);
         console.log('   Mock response:', JSON.stringify(mockResponse, null, 2));
         
         try {
@@ -1638,7 +1640,7 @@ const createConformOrder = async (req, res) => {
             `UPDATE ${dbPrefix}bookings 
              SET conform_order_json = ?, updated_at = NOW()
              WHERE id = ?`,
-            [JSON.stringify(mockResponse), id]
+            [JSON.stringify(mockResponse), requestData.id]
           );
           
           console.log('✅ Database updated successfully with mock response');
