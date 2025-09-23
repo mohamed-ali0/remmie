@@ -1614,8 +1614,6 @@ const createConformOrder = async (req, res) => {
           errorMessage.includes('price_changed') ||
           errorCode === 'price_changed') {
         console.log('⚠️ Offer expired/price changed, creating mock confirmation for testing');
-        console.log('🔍 Debug - id variable:', id);
-        console.log('🔍 Debug - data variable:', data);
         
         const mockResponse = {
           data: {
