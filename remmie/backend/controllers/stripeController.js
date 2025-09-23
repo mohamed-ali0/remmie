@@ -902,6 +902,30 @@ async function PaymentTest(req, res) {
 
   }
 
+// Debug endpoint to check API configuration
+async function testApiConfig(req, res) {
+  try {
+    const config = {
+      duffel_api_url: process.env.DUFFEL_API_URL,
+      duffel_token_configured: !!process.env.DUFFEL_ACCESS_TOKENS,
+      stripe_key_configured: !!process.env.STRIPE_SECRET_KEY,
+      frontend_url: process.env.FRONTEND_URL
+    };
+    
+    res.json({
+      success: true,
+      config: config,
+      message: 'API configuration check'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check API configuration',
+      error: error.message
+    });
+  }
+}
+
 // Test endpoints for complete booking flow simulation
 async function testOneWayBooking(req, res) {
   try {
@@ -928,13 +952,22 @@ async function testOneWayBooking(req, res) {
 
     console.log('🔍 Searching for real flights...');
     
+    // Check if Duffel API credentials are configured
+    if (!process.env.DUFFEL_ACCESS_TOKENS || !process.env.DUFFEL_API_URL) {
+      console.error('❌ Duffel API credentials not configured');
+      return res.status(500).json({
+        success: false,
+        message: 'Duffel API credentials not configured'
+      });
+    }
+    
     // Call your real flight search API
     const searchResponse = await axios.post(
       `${process.env.DUFFEL_API_URL}/air/offer_requests`,
       flightSearchData,
       {
         headers: {
-          'Authorization': `Bearer ${process.env.DUFFEL_ACCESS_TOKEN}`,
+          'Authorization': `Bearer ${process.env.DUFFEL_ACCESS_TOKENS}`,
           'Accept-Encoding': 'gzip',
           'Accept': 'application/json',
           'Duffel-Version': 'v2',
@@ -1034,10 +1067,21 @@ async function testOneWayBooking(req, res) {
 
   } catch (error) {
     console.error('Test one-way booking error:', error);
+    
+    // Provide more specific error messages
+    let errorMessage = 'Failed to create test one-way booking';
+    if (error.response?.status === 401) {
+      errorMessage = 'Duffel API authentication failed - check API token';
+    } else if (error.response?.status === 400) {
+      errorMessage = 'Invalid flight search parameters';
+    } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+      errorMessage = 'Cannot connect to Duffel API - check network connection';
+    }
+    
     res.status(500).json({ 
       success: false, 
-      message: 'Failed to create test one-way booking',
-      error: error.message 
+      message: errorMessage,
+      error: error.response?.data?.errors?.[0]?.detail || error.message 
     });
   }
 }
@@ -1072,13 +1116,22 @@ async function testRoundTripBooking(req, res) {
 
     console.log('🔍 Searching for real round-trip flights...');
     
+    // Check if Duffel API credentials are configured
+    if (!process.env.DUFFEL_ACCESS_TOKENS || !process.env.DUFFEL_API_URL) {
+      console.error('❌ Duffel API credentials not configured');
+      return res.status(500).json({
+        success: false,
+        message: 'Duffel API credentials not configured'
+      });
+    }
+    
     // Call your real flight search API
     const searchResponse = await axios.post(
       `${process.env.DUFFEL_API_URL}/air/offer_requests`,
       flightSearchData,
       {
         headers: {
-          'Authorization': `Bearer ${process.env.DUFFEL_ACCESS_TOKEN}`,
+          'Authorization': `Bearer ${process.env.DUFFEL_ACCESS_TOKENS}`,
           'Accept-Encoding': 'gzip',
           'Accept': 'application/json',
           'Duffel-Version': 'v2',
@@ -1179,10 +1232,21 @@ async function testRoundTripBooking(req, res) {
 
   } catch (error) {
     console.error('Test round-trip booking error:', error);
+    
+    // Provide more specific error messages
+    let errorMessage = 'Failed to create test round-trip booking';
+    if (error.response?.status === 401) {
+      errorMessage = 'Duffel API authentication failed - check API token';
+    } else if (error.response?.status === 400) {
+      errorMessage = 'Invalid flight search parameters';
+    } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+      errorMessage = 'Cannot connect to Duffel API - check network connection';
+    }
+    
     res.status(500).json({ 
       success: false, 
-      message: 'Failed to create test round-trip booking',
-      error: error.message 
+      message: errorMessage,
+      error: error.response?.data?.errors?.[0]?.detail || error.message 
     });
   }
 }
@@ -1198,6 +1262,7 @@ module.exports = {
   userPaymentMethodsSetDefault,
   userPaymentMethodsDelete,
   PaymentTest,
+  testApiConfig,
   testOneWayBooking,
   testRoundTripBooking
 };
