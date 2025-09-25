@@ -1365,18 +1365,11 @@ const createConformOrder = async (req, res) => {
     
     const hasRoundTripSession = bookingRows.length > 0 && bookingRows[0].round_trip_session_id;
     
-    // Check if this is a test booking first
-    const isTestBooking = data.is_test_booking;
-    
     // Check if this is a round-trip booking (either has session or has combined offer ID)
-    const selectedOfferId = data.selected_offers ? data.selected_offers[0] : null;
+    const selectedOfferId = data.selected_offers[0];
     const isOldRoundTrip = selectedOfferId && selectedOfferId.startsWith('rt_');
     
-    if (isTestBooking) {
-      // Test booking: search for fresh offers and create order
-      console.log('🧪 Processing test booking with fresh offer search');
-      // This will be handled in the else block below
-    } else if (hasRoundTripSession) {
+    if (hasRoundTripSession) {
       // New round-trip design: already have separate bookings with session ID
       console.log('🔄 Processing round-trip with session ID:', bookingRows[0].round_trip_session_id);
       
@@ -1566,71 +1559,8 @@ const createConformOrder = async (req, res) => {
       res.status(200).json(combinedOrderJson);
       
     } else {
-      // One-way booking or test booking (original logic)
-      console.log('✈️ Processing one-way booking or test booking');
-      
-      // Check if this is a test booking that needs fresh offers
-      if (data.is_test_booking && data.search_params) {
-        console.log('🧪 Test booking detected - searching for fresh offers...');
-        
-        // Search for fresh offers using stored search parameters
-        const searchData = {
-          data: {
-            slices: [{
-              origin: data.search_params.origin,
-              destination: data.search_params.destination,
-              departure_date: data.search_params.departure_date
-            }],
-            passengers: data.search_params.passengers,
-            cabin_class: data.search_params.cabin_class
-          }
-        };
-        
-        try {
-          const freshSearchResponse = await axios.post(
-            `${duffel_api_url}/air/offer_requests`,
-            searchData,
-            {
-              headers: {
-                'Authorization': `Bearer ${duffel_access_tokens}`,
-                'Accept-Encoding': 'gzip',
-                'Accept': 'application/json',
-                'Duffel-Version': 'v2',
-                'Content-Type': 'application/json'
-              }
-            }
-          );
-          
-          if (freshSearchResponse.data.data.offers && freshSearchResponse.data.data.offers.length > 0) {
-            const freshOffer = freshSearchResponse.data.data.offers[0];
-            console.log('✅ Fresh offer found:', freshOffer.id);
-            
-            // Update data with fresh offer information
-            data.offer_id = freshOffer.id;
-            data.selected_offers = [freshOffer.id];
-            data.offer_request_id = freshSearchResponse.data.data.id;
-            data.slices = freshOffer.slices;
-            data.passengers = freshSearchResponse.data.data.passengers;
-            data.total_amount = freshOffer.total_amount;
-            data.currency = freshOffer.total_currency;
-            data.base_amount = freshOffer.base_amount;
-            data.tax_amount = freshOffer.tax_amount;
-            data.conditions = freshOffer.conditions;
-            data.payments = [{
-              type: "balance",
-              amount: freshOffer.total_amount,
-              currency: freshOffer.total_currency
-            }];
-          } else {
-            console.log('⚠️ No fresh offers found, using original data');
-          }
-        } catch (searchError) {
-          console.error('❌ Failed to search for fresh offers:', searchError.message);
-          console.log('⚠️ Using original data for test booking');
-        }
-      }
-      
-      console.log('🚀 Creating Duffel order with data:', JSON.stringify(data, null, 2));
+      // One-way booking (original logic)
+      console.log('✈️ Processing one-way booking');
       
       const response = await axios.post(
         `${duffel_api_url}/air/orders`,
@@ -1669,56 +1599,6 @@ const createConformOrder = async (req, res) => {
 
   } catch (error) {
     console.error('Create conform order error:', error.message);
-    console.error('Duffel API error response:', error.response?.data);
-    console.error('Duffel API error status:', error.response?.status);
-    
-    // Handle expired/price-changed offers with mock response for testing
-    if (error.response?.status === 422 && error.response?.data?.errors) {
-      const errorMessage = error.response.data.errors[0]?.message || '';
-      const errorCode = error.response.data.errors[0]?.code || '';
-      
-      if (errorMessage.includes('expired') || 
-          errorMessage.includes('not available') || 
-          errorMessage.includes('price_changed') ||
-          errorCode === 'price_changed') {
-        console.log('⚠️ Offer expired/price changed, creating mock confirmation for testing');
-        
-        const mockResponse = {
-          data: {
-            id: `mock_order_${requestData.id}`,
-            booking_reference: `MOCK-${Date.now()}`,
-            status: 'confirmed',
-            message: 'Booking confirmed (test mode - offer expired/price changed)',
-            slices: data.slices || [],
-            passengers: data.passengers || [],
-            total_amount: data.total_amount || '0',
-            total_currency: data.currency || 'USD'
-          }
-        };
-        
-        // Update database with mock response
-        console.log('💾 Updating database with mock response...');
-        console.log('   Booking ID:', requestData.id);
-        console.log('   Mock response:', JSON.stringify(mockResponse, null, 2));
-        
-        try {
-          await pool.query(
-            `UPDATE ${dbPrefix}bookings 
-             SET conform_order_json = ?, updated_at = NOW()
-             WHERE id = ?`,
-            [JSON.stringify(mockResponse), requestData.id]
-          );
-          
-          console.log('✅ Database updated successfully with mock response');
-          return res.status(200).json(mockResponse);
-        } catch (dbError) {
-          console.error('❌ Database update failed:', dbError);
-          // Still return the mock response even if DB update fails
-          return res.status(200).json(mockResponse);
-        }
-      }
-    }
-    
     // Return Duffel error as-is
     if (error.response) {
       res.status(error.response.status).json(error.response.data);

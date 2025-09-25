@@ -94,7 +94,6 @@ return (
                     <li><Link to="/about">About Us</Link></li>
                     <li><Link to="/faq">FAQs</Link></li>
                     <li><Link to="/flightorderhistory">Booking</Link></li>
-                    {isLoggedIn && <li><Link to="/test">Test Bookings</Link></li>}
                   </ul>                
                 </div>
                 <div className='nav_user d-flex align-items-center gap-2 ms-4'>
